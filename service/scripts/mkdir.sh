@@ -1,10 +1,9 @@
 #!/bin/bash
 
-DIRPATH=$1
+DIR=$1
 
-if [ -d $DIRPATH ]; then 
+if [ -d $DIR ]; then 
     exit 0
 else 
-    mkdir $DIRPATH
-    exit 1
+    mkdir $DIR
 fi

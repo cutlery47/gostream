@@ -63,6 +63,8 @@ func (s *Server) Shutdown(sigChan <-chan os.Signal) error {
 	// waiting for shutdown signal to arrive
 	<-sigChan
 
+	log.Println("http server shutdown")
+
 	// graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()

@@ -5,9 +5,8 @@ import (
 )
 
 func Run() {
-	eHandler := service.NewLocalErrHandler()
 	handler := service.NewHttpHandler()
 
-	service := service.New(handler, eHandler)
+	service := service.New(handler)
 	service.Run()
 }

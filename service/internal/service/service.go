@@ -1,42 +1,33 @@
 package service
 
+import (
+	"log"
+)
+
 type Service struct {
-	handler  Handler
-	eHandler ErrHandler
+	handler Handler
+}
+
+func (s *Service) handleErr(err error) {
+	log.Println(err)
 }
 
 func (s *Service) Run() {
-	videoName, err := s.handler.getVideoName()
-	if err != nil {
-		s.eHandler.Handle(err)
-		return
+	for {
+		fileName, err := s.handler.getMediaName()
+		if err != nil {
+			s.handleErr(err)
+		}
+
+		err = s.handler.serveMedia(fileName)
+		if err != nil {
+			s.handleErr(err)
+		}
 	}
-
-	err = s.handler.findVideo(videoName)
-	if err != nil {
-		s.eHandler.Handle(err)
-		return
-	}
-
-	s.handler.findOrCreateDir(videoName)
-
-	err = s.handler.segmentVideo(videoName)
-	if err != nil {
-		s.eHandler.Handle(err)
-		return
-	}
-
-	err = s.handler.returnManifest(videoName)
-	if err != nil {
-		s.eHandler.Handle(err)
-		return
-	}
-
 }
 
-func New(handler Handler, eHandler ErrHandler) *Service {
+func New(handler Handler) *Service {
 	return &Service{
-		handler:  handler,
-		eHandler: eHandler,
+		handler: handler,
 	}
 }

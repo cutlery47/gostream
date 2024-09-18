@@ -2,9 +2,10 @@ package controller
 
 import (
 	"errors"
-	"log"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 var (
@@ -12,10 +13,12 @@ var (
 	errNotFound       = errors.New("resource not found")
 )
 
-type errHandler struct{}
+type errHandler struct {
+	log *zap.Logger
+}
 
 func (eh errHandler) handle(err error) *echo.HTTPError {
-	log.Println("An error occurred:", err)
+	eh.log.Error(fmt.Sprintf("Error: %v", err))
 
 	// error -> HTTPError mapping
 	if errors.Is(err, errNotFound) {

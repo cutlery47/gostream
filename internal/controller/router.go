@@ -6,6 +6,7 @@ import (
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/cutlery47/gostream/internal/utils"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 type router struct {
@@ -14,10 +15,11 @@ type router struct {
 	errHandler      errHandler
 }
 
-func newRouter(manifestService, chunkService service.Service) *router {
+func newRouter(manifestService, chunkService service.Service, errLog *zap.Logger) *router {
 	return &router{
 		manifestService: manifestService,
 		chunkService:    chunkService,
+		errHandler:      errHandler{log: errLog},
 	}
 }
 
@@ -46,5 +48,6 @@ func (r *router) serve(c echo.Context, filename string, service service.Service)
 		return r.errHandler.handle(err)
 	}
 
+	// returning the file
 	return c.Blob(200, "application/pizdec", blob.Bytes())
 }

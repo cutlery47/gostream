@@ -49,5 +49,5 @@ func (r *router) serve(c echo.Context, filename string, service service.Service)
 	}
 
 	// returning the file
-	return c.Blob(200, "application/pizdec", blob.Bytes())
+	return c.Blob(200, "application/mpeg", blob.Bytes())
 }

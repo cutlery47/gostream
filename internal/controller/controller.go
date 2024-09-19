@@ -32,7 +32,7 @@ func New(manifestService, chunkService service.Service, reqLog, errLog, infoLog 
 						zap.Int("status", v.Status),
 						zap.String("IP", v.RemoteIP),
 						zap.String("URI", v.URI),
-						zap.String("error", v.Error.Error()),
+						zap.Error(v.Error),
 					)
 					return nil
 				},

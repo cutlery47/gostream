@@ -3,6 +3,8 @@ package storage
 import (
 	"fmt"
 	"os"
+
+	"github.com/cutlery47/gostream/internal/utils"
 )
 
 type Storage interface {
@@ -47,7 +49,8 @@ func NewLocalChunkStorage(chunkPath string) *LocalChunkStorage {
 }
 
 func (lcs *LocalChunkStorage) Get(filename string) (*os.File, error) {
-	return nil, nil
+	chunkdir := utils.RemoveSuffix(filename, "_")
+	return os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
 }
 
 func (lcs *LocalChunkStorage) Exists(filename string) bool {

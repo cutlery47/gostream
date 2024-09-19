@@ -19,7 +19,7 @@ func newRouter(manifestService, chunkService service.Service, errLog *zap.Logger
 	return &router{
 		manifestService: manifestService,
 		chunkService:    chunkService,
-		errHandler:      errHandler{log: errLog},
+		errHandler:      *newErrHandler(errLog),
 	}
 }
 

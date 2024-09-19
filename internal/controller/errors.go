@@ -1,29 +1,42 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/cutlery47/gostream/internal/service"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
 
-var (
-	errInternalServer = errors.New("internal server error")
-	errNotFound       = errors.New("resource not found")
-)
-
 type errHandler struct {
 	log *zap.Logger
+	// ServiceError -> echo.HTTPError mapping
+	errMap map[*service.ServiceError]*echo.HTTPError
+}
+
+func newErrHandler(errLog *zap.Logger) *errHandler {
+	errMap := map[*service.ServiceError]*echo.HTTPError{
+		service.ErrManifestNotFound: echo.ErrNotFound,
+	}
+
+	return &errHandler{
+		log:    errLog,
+		errMap: errMap,
+	}
 }
 
 func (eh errHandler) handle(err error) *echo.HTTPError {
 	eh.log.Error(fmt.Sprintf("Error: %v", err))
 
-	// error -> HTTPError mapping
-	if errors.Is(err, errNotFound) {
-		return echo.NewHTTPError(404, errNotFound)
-	} else {
-		return echo.NewHTTPError(500, errInternalServer)
+	// trying to map err to HTTPError
+	if err, ok := err.(*service.ServiceError); ok {
+		if httpErr, ok := eh.errMap[err]; ok {
+			return httpErr
+		}
 	}
+
+	// return 500 if:
+	// 1) err couldn't be mapped to HTTPError
+	// 2) err is an unexpected error
+	return echo.ErrInternalServerError
 }

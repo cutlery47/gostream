@@ -16,8 +16,9 @@ type errHandler struct {
 
 func newErrHandler(errLog *zap.Logger) *errHandler {
 	errMap := map[*service.ServiceError]*echo.HTTPError{
-		service.ErrManifestNotFound: echo.ErrNotFound,
-		service.ErrVideoNotFound:    echo.ErrNotFound,
+		service.ErrManifestNotFound:      echo.ErrNotFound,
+		service.ErrVideoNotFound:         echo.ErrNotFound,
+		service.ErrSegmentationException: echo.ErrInternalServerError,
 	}
 
 	return &errHandler{

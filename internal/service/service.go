@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/storage"
@@ -56,28 +55,46 @@ func (ms *manifestService) Serve(filename string) (*os.File, error) {
 		return nil, ErrVideoNotFound
 	}
 
-	utils.MKDir(ms.chunkStorage.Path()).Run()
-	utils.MKDir(ms.manStorage.Path()).Run()
+	return ms.createManifest(filename)
+}
+
+func (ms *manifestService) createManifest(filename string) (*os.File, error) {
+	chunkDir := ms.chunkStorage.Path()
+	manDir := ms.manStorage.Path()
+	vidDir := ms.vidStorage.Path()
+
+	ms.checkOrCreateDirs(chunkDir, manDir, filename)
 
 	cmd := utils.SegmentVideoAndCreateManifest(
 		// precise file path
-		fmt.Sprintf("%v/%v.mp4", ms.vidStorage.Path(), filename),
+		fmt.Sprintf("%v/%v.mp4", vidDir, filename),
 		// precise manifest path
-		fmt.Sprintf("%v/%v.m3u8", ms.manStorage.Path(), filename),
+		fmt.Sprintf("%v/%v.m3u8", manDir, filename),
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", ms.chunkStorage.Path(), filename),
+		fmt.Sprintf("%v/%v/%v_%%4d.ts", chunkDir, filename, filename),
 		ms.segTime,
 	)
 
-	log.Println(cmd.Args)
-
-	out, err := cmd.Output()
+	// check if segmentation went smoothely
+	_, err := cmd.Output()
 	if err != nil {
-		ms.log.Info(fmt.Sprintf("seg err: %v", err.Error()))
+		return nil, err
 	}
-	ms.log.Info(string(out))
+
+	// newly created manifest retrieval
+	manifest, err := ms.manStorage.Get(fmt.Sprintf("%v.m3u8", filename))
+	if err != nil {
+		return nil, err
+	}
 
 	return manifest, nil
+}
+
+func (ms *manifestService) checkOrCreateDirs(chunkDir, manDir, filename string) {
+	// creating necessary directories, if nonexistant
+	utils.MKDir(chunkDir).Run()                                 // chunk dir
+	utils.MKDir(fmt.Sprintf("%v/%v", chunkDir, filename)).Run() // chunk file dir
+	utils.MKDir(manDir).Run()                                   // manifest dir
 }
 
 type chunkService struct {

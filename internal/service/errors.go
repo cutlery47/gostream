@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrManifestNotFound = newServiceError("couldn't find requested manifest file")
-	ErrVideoNotFound    = newServiceError("couldn't find requested video file")
+	ErrManifestNotFound      = newServiceError("couldn't find requested manifest file")
+	ErrVideoNotFound         = newServiceError("couldn't find requested video file")
+	ErrSegmentationException = newServiceError("couldn't segment the file")
 )
 
 type ServiceError struct {

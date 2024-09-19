@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Log loggerConfig
+	Log     loggerConfig
+	Storage storageConfig
 }
 
 type loggerConfig struct {
@@ -16,16 +17,37 @@ type loggerConfig struct {
 	InfoLogsPath    string
 }
 
+type storageConfig struct {
+	StorageType string
+	Local       localStorageConfig
+}
+
+type localStorageConfig struct {
+	ManifestPath string
+	ChunkPath    string
+}
+
 func New() *Config {
 	godotenv.Load(".env")
 
-	log := loggerConfig{
+	lsConfig := localStorageConfig{
+		ManifestPath: os.Getenv("MANIFEST_PATH"),
+		ChunkPath:    os.Getenv("CHUNK_PATH"),
+	}
+
+	sConfig := storageConfig{
+		StorageType: os.Getenv("STORAGE_TYPE"),
+		Local:       lsConfig,
+	}
+
+	logConfig := loggerConfig{
 		RequestLogsPath: os.Getenv("REQUEST_LOGS_PATH"),
 		ErrorLogsPath:   os.Getenv("ERROR_LOGS_PATH"),
 		InfoLogsPath:    os.Getenv("INFO_LOGS_PATH"),
 	}
 
 	return &Config{
-		Log: log,
+		Log:     logConfig,
+		Storage: sConfig,
 	}
 }

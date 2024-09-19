@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrManifestNotFound = newServiceError("couldn't find requested manifest file")
+	ErrVideoNotFound    = newServiceError("couldn't find requested video file")
 )
 
 type ServiceError struct {

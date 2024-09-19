@@ -1,48 +1,66 @@
 package service
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/storage"
+	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
-)
-
-const (
-	// directory for storing videos
-	videoDir = "vids"
-	// directory for storing video segments
-	segmentDir = videoDir + "/segmented"
-	// length (in seconds) of a single video segment
-	segmentTime = 4
 )
 
 type Service interface {
 	Serve(filename string) (*os.File, error)
 }
 
+// TODO: figure out how to isolate manifestService from chunkStorage
+
 type manifestService struct {
-	log       *zap.Logger
-	errHander errHandler
-	storage   storage.Storage
+	log          *zap.Logger
+	errHander    errHandler
+	manStorage   storage.Storage
+	vidStorage   storage.Storage
+	chunkStorage storage.Storage
+	// length of each segmented piece
+	segTime int
 }
 
-func NewManifestService(infoLog, errLog *zap.Logger, storage storage.Storage) *manifestService {
+func NewManifestService(infoLog, errLog *zap.Logger, manStorage, vidStorage, chunkStorage storage.Storage, segTime int) *manifestService {
 	errHandler := errHandler{
 		log: errLog,
 	}
 
 	return &manifestService{
-		log:       infoLog,
-		errHander: errHandler,
-		storage:   storage,
+		log:          infoLog,
+		errHander:    errHandler,
+		manStorage:   manStorage,
+		vidStorage:   vidStorage,
+		chunkStorage: chunkStorage,
+		segTime:      segTime,
 	}
 }
 
 func (ms *manifestService) Serve(filename string) (*os.File, error) {
-	manifest, err := ms.storage.Get(filename)
+	// check if we already store the manifest file
+	manifest, err := ms.manStorage.Get(fmt.Sprintf("%v.m3u8", filename))
 	if err != nil {
-		ms.log.Info("Requested manifest is not currently stored... Creating")
+		ms.log.Info(fmt.Sprintf("Manifest for file (%v) is not stored... Creating", filename))
+	} else {
+		return manifest, nil
 	}
+
+	// check if video file is even stored
+	if !ms.vidStorage.Exists(fmt.Sprintf("%v.mp4", filename)) {
+		return nil, ErrVideoNotFound
+	}
+
+	out := utils.SegmentVideoAndCreateManifest(
+		ms.vidStorage.Path(),
+		ms.manStorage.Path(),
+		ms.chunkStorage.Path(),
+		ms.segTime,
+	)
+	ms.log.Info(out.String())
 
 	return manifest, nil
 }

@@ -8,6 +8,7 @@ import (
 
 var (
 	ErrManifestNotFound      = newServiceError("couldn't find requested manifest file")
+	ErrChunkNotFound         = newServiceError("couldn't find requested chunk file")
 	ErrVideoNotFound         = newServiceError("couldn't find requested video file")
 	ErrSegmentationException = newServiceError("couldn't segment the file")
 )

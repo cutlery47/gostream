@@ -116,5 +116,10 @@ func NewChunkService(infoLog, errLog *zap.Logger, storage storage.Storage) *chun
 }
 
 func (cs *chunkService) Serve(filename string) (*os.File, error) {
-	return nil, nil
+	chunk, err := cs.storage.Get(filename)
+	if err != nil {
+		return nil, ErrChunkNotFound
+	}
+
+	return chunk, nil
 }

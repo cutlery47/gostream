@@ -2,6 +2,7 @@ package utils
 
 import (
 	"os/exec"
+	"strconv"
 )
 
 // creates directory if one doesn't exits
@@ -14,6 +15,6 @@ func FindVideo(path string) *exec.Cmd {
 	return exec.Command("/bin/bash", "scripts/find.sh", path)
 }
 
-func SegmentVideoAndCreateManifest(vidPath, segPath, chunkPath string, segTime int) *exec.Cmd {
-	return exec.Command("/bin/bash", "scripts/segment.sh", vidPath, segPath, chunkPath, string(segTime))
+func SegmentVideoAndCreateManifest(vidPath, manPath, chunkPath string, segTime int) *exec.Cmd {
+	return exec.Command("/bin/bash", "scripts/segment.sh", vidPath, manPath, chunkPath, strconv.Itoa(segTime))
 }

@@ -3,7 +3,7 @@
 # path to the video file
 VIDPATH=$1
 # path to the segment list file (manifest path)
-SEGPATH=$2
+MANPATH=$2
 # path to the chunk file (chunk file template)
 CHUNKPATH=$3
 # segmentation interval length

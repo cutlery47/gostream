@@ -11,6 +11,7 @@ import (
 
 type Service interface {
 	Serve(filename string) (*os.File, error)
+	Upload(file *os.File) error
 }
 
 // TODO: figure out how to isolate manifestService from chunkStorage
@@ -97,6 +98,10 @@ func (ms *manifestService) checkOrCreateDirs(chunkDir, manDir, filename string) 
 	utils.MKDir(manDir).Run()                                   // manifest dir
 }
 
+func (ms *manifestService) Upload(file *os.File) error {
+	return ErrNotImplemented
+}
+
 type chunkService struct {
 	log        *zap.Logger
 	errHandler errHandler
@@ -122,4 +127,11 @@ func (cs *chunkService) Serve(filename string) (*os.File, error) {
 	}
 
 	return chunk, nil
+}
+
+func (cs *chunkService) Upload(file *os.File) error {
+	return ErrNotImplemented
+}
+
+type videoService struct {
 }

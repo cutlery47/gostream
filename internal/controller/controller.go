@@ -40,7 +40,11 @@ func New(manifestService, chunkService service.Service, reqLog, errLog, infoLog 
 		),
 	)
 
-	e.GET("api/v1/:filename", r.demux)
+	// file retrieval
+	e.GET("api/v1/:filename", r.getFile)
+
+	// file upload
+	e.POST("api/v1/upload", r.uploadFile)
 
 	return &Controller{
 		echo:   e,

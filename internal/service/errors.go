@@ -11,6 +11,7 @@ var (
 	ErrChunkNotFound         = newServiceError("couldn't find requested chunk file")
 	ErrVideoNotFound         = newServiceError("couldn't find requested video file")
 	ErrSegmentationException = newServiceError("couldn't segment the file")
+	ErrNotImplemented        = newServiceError("feature is not implemented")
 )
 
 type ServiceError struct {

@@ -23,19 +23,21 @@ func newRouter(manifestService, chunkService service.Service, errLog *zap.Logger
 	}
 }
 
-func (r *router) demux(c echo.Context) error {
+// GET /api/v1/:filename
+func (r *router) getFile(c echo.Context) error {
+	c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+
 	filename := c.Param("filename")
 	if strings.HasSuffix(filename, ".ts") {
 		// transport stream was requested
-		return r.serve(c, filename, r.chunkService)
+		return r.serveFile(c, filename, r.chunkService)
 	} else {
 		// manifest file was requested
-		return r.serve(c, filename, r.manifestService)
+		return r.serveFile(c, filename, r.manifestService)
 	}
 }
 
-// GET /api/v1/:filename
-func (r *router) serve(c echo.Context, filename string, service service.Service) error {
+func (r *router) serveFile(c echo.Context, filename string, service service.Service) error {
 	// searching for requested file on the current system
 	file, err := service.Serve(filename)
 	if err != nil {
@@ -50,4 +52,8 @@ func (r *router) serve(c echo.Context, filename string, service service.Service)
 
 	// returning the file
 	return c.Blob(200, "application/mpeg", blob.Bytes())
+}
+
+func (r *router) uploadFile(c echo.Context) error {
+	return echo.ErrNotImplemented
 }

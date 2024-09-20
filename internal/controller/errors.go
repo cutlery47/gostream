@@ -20,6 +20,7 @@ func newErrHandler(errLog *zap.Logger) *errHandler {
 		service.ErrManifestNotFound:      echo.ErrNotFound,
 		service.ErrVideoNotFound:         echo.ErrNotFound,
 		service.ErrSegmentationException: echo.ErrInternalServerError,
+		service.ErrNotImplemented:        echo.ErrNotImplemented,
 	}
 
 	return &errHandler{

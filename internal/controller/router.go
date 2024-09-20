@@ -13,23 +13,16 @@ import (
 )
 
 type router struct {
-	videoService    service.UploadRemoveService
-	manifestService service.Service
-	chunkService    service.Service
-	errHandler      errHandler
+	service    service.Service
+	errHandler errHandler
 }
 
 func newRouter(
 	errLog *zap.Logger,
-	chunkService service.Service,
-	manifestService service.Service,
-	videoService service.UploadRemoveService) *router {
-
+	service service.Service) *router {
 	return &router{
-		manifestService: manifestService,
-		chunkService:    chunkService,
-		videoService:    videoService,
-		errHandler:      *newErrHandler(errLog),
+		service:    service,
+		errHandler: *newErrHandler(errLog),
 	}
 }
 
@@ -70,19 +63,19 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 	// searching for requested file on the current system
 	if strings.HasSuffix(filename, ".ts") {
 		// transport stream was requested
-		file, err = r.chunkService.Serve(filename)
+		file, err = r.service.ServeChunk(filename)
 		if err != nil {
 			return r.errHandler.handle(err)
 		}
 	} else if strings.HasSuffix(filename, ".mp4") {
 		// entire file was requested
-		file, err = r.videoService.Serve(filename)
+		file, err = r.service.ServeEntireVideo(filename)
 		if err != nil {
 			return r.errHandler.handle(err)
 		}
 	} else {
 		// manifest file was requested
-		file, err = r.manifestService.Serve(filename)
+		file, err = r.service.ServeManifest(filename)
 		if err != nil {
 			return r.errHandler.handle(err)
 		}
@@ -100,7 +93,7 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 
 func (r *router) upload(c echo.Context, filename string, multipart multipart.File) error {
 	if strings.HasSuffix(filename, ".mp4") {
-		if err := r.videoService.Upload(multipart, filename); err != nil {
+		if err := r.service.UploadVideo(multipart, filename); err != nil {
 			return r.errHandler.handle(err)
 		}
 	} else {
@@ -112,11 +105,11 @@ func (r *router) upload(c echo.Context, filename string, multipart multipart.Fil
 
 func (r *router) delete(c echo.Context, filename string) error {
 	if strings.HasSuffix(filename, ".mp4") {
-		if err := r.videoService.Remove(filename); err != nil {
+		if err := r.service.RemoveVideo(filename); err != nil {
 			return r.errHandler.handle(err)
 		}
 	} else {
-		if err := r.videoService.Remove(fmt.Sprintf("%v.mp4", filename)); err != nil {
+		if err := r.service.RemoveVideo(fmt.Sprintf("%v.mp4", filename)); err != nil {
 			return r.errHandler.handle(err)
 		}
 	}

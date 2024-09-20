@@ -14,12 +14,10 @@ type Controller struct {
 }
 
 func New(
-	chunkService service.Service,
-	manifestService service.Service,
-	videoService service.UploadRemoveService,
+	service service.Service,
 	reqLog, errLog, infoLog *zap.Logger) *Controller {
 	e := echo.New()
-	r := newRouter(errLog, chunkService, manifestService, videoService)
+	r := newRouter(errLog, service)
 
 	e.Use(
 		middleware.RequestLoggerWithConfig(

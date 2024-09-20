@@ -7,6 +7,6 @@ MANPATH=$2
 # path to the chunk file (chunk file template)
 CHUNKPATH=$3
 # segmentation interval length
-SEGTIME=$4
+SEGTIME=${SEGMENT_TIME:-4}
 
 ffmpeg -i $VIDPATH -codec copy -f ssegment -segment_time $SEGTIME -segment_list $MANPATH -segment_list_type m3u8 $CHUNKPATH

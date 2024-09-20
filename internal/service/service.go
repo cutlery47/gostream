@@ -4,154 +4,111 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cutlery47/gostream/internal/storage"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
 
 type Service interface {
-	Serve(filename string) (io.Reader, error)
+	ServeManifest(filename string) (io.Reader, error)
+	ServeChunk(filename string) (io.Reader, error)
+	ServeEntireVideo(filename string) (io.Reader, error)
+	UploadVideo(file io.Reader, filename string) error
+	RemoveVideo(filename string) error
 }
 
-type Uploader interface {
-	Upload(file io.Reader, filename string) error
+type StreamService struct {
+	chunkHandler    RemoveRetriever
+	manifestHandler RemoveRetriever
+	videoHandler    UploadRemoveRetriever
+	log             *zap.Logger
 }
 
-type Remover interface {
-	Remove(filename string) error
-}
-
-type UploadRemoveService interface {
-	Service
-	Uploader
-	Remover
-}
-
-// TODO: figure out how to isolate manifestService from chunkStorage
-
-type manifestService struct {
-	log          *zap.Logger
-	manStorage   storage.Storage
-	vidStorage   storage.Storage
-	chunkStorage storage.Storage // trash
-	// length of each segmented piece
-	segTime int
-}
-
-func NewManifestService(infoLog, errLog *zap.Logger, manStorage, vidStorage, chunkStorage storage.Storage, segTime int) *manifestService {
-
-	return &manifestService{
-		log:          infoLog,
-		manStorage:   manStorage,
-		vidStorage:   vidStorage,
-		chunkStorage: chunkStorage,
-		segTime:      segTime,
+func NewStreamService(
+	chunkHandler RemoveRetriever,
+	manifestHandler RemoveRetriever,
+	videoHandler UploadRemoveRetriever,
+	log *zap.Logger,
+) *StreamService {
+	return &StreamService{
+		chunkHandler:    chunkHandler,
+		manifestHandler: manifestHandler,
+		videoHandler:    videoHandler,
+		log:             log,
 	}
 }
 
-func (ms *manifestService) Serve(filename string) (io.Reader, error) {
+// TODO: add chunk checks
+func (ss *StreamService) ServeManifest(filename string) (io.Reader, error) {
 	// check if we already store the manifest file
-	manifest, err := ms.manStorage.Get(fmt.Sprintf("%v.m3u8", filename))
-	if err != nil {
-		ms.log.Info(fmt.Sprintf("Manifest for file (%v) is not stored... Creating", filename))
-	} else {
-		ms.log.Info(fmt.Sprintf("Manifest for file (%v) is stored!", filename))
+	if manifest, _ := ss.manifestHandler.Retrieve(filename); manifest != nil {
+		ss.log.Info("Manifest for %v is already stored. Returning...")
 		return manifest, nil
 	}
 
 	// check if video file is even stored
-	if !ms.vidStorage.Exists(fmt.Sprintf("%v.mp4", filename)) {
+	if !ss.videoHandler.Exists(fmt.Sprintf("%v.mp4", filename)) {
 		return nil, ErrVideoNotFound
 	}
 
-	return ms.createManifest(filename)
-}
+	chunkDir := ss.chunkHandler.Path()
+	chunkFileDir := fmt.Sprintf("%v/%v", ss.chunkHandler.Path(), filename)
+	manifestDir := ss.manifestHandler.Path()
+	videoDir := ss.videoHandler.Path()
 
-func (ms *manifestService) createManifest(filename string) (io.Reader, error) {
-	chunkDir := ms.chunkStorage.Path()
-	manDir := ms.manStorage.Path()
-	vidDir := ms.vidStorage.Path()
-
-	ms.checkOrCreateDirs(chunkDir, manDir, filename)
+	ss.createDirs(chunkDir, chunkFileDir, manifestDir, videoDir)
 
 	cmd := utils.SegmentVideoAndCreateManifest(
 		// precise file path
-		fmt.Sprintf("%v/%v.mp4", vidDir, filename),
+		fmt.Sprintf("%v/%v.mp4", videoDir, filename),
 		// precise manifest path
-		fmt.Sprintf("%v/%v.m3u8", manDir, filename),
+		fmt.Sprintf("%v/%v.m3u8", manifestDir, filename),
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v/%v_%%4d.ts", chunkDir, filename, filename),
-		ms.segTime,
+		fmt.Sprintf("%v/%v_%%4d.ts", chunkFileDir, filename),
 	)
 
 	// check if segmentation went smoothely
-	_, err := cmd.Output()
-	if err != nil {
+	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
 
-	// newly created manifest retrieval
-	manifest, err := ms.manStorage.Get(fmt.Sprintf("%v.m3u8", filename))
-	if err != nil {
-		return nil, err
-	}
-
-	return manifest, nil
+	return ss.manifestHandler.Retrieve(filename)
 }
 
-func (ms *manifestService) checkOrCreateDirs(chunkDir, manDir, filename string) {
-	// creating necessary directories, if nonexistant
-	utils.MKDir(chunkDir).Run()                                 // chunk dir
-	utils.MKDir(fmt.Sprintf("%v/%v", chunkDir, filename)).Run() // chunk file dir
-	utils.MKDir(manDir).Run()                                   // manifest dir
+func (ss *StreamService) createDirs(chunkDir, chunkFileDir, manifestDir, videoDir string) {
+	utils.MKDir(chunkDir)
+	utils.MKDir(chunkFileDir)
+	utils.MKDir(manifestDir)
+	utils.MKDir(videoDir)
 }
 
-type chunkService struct {
-	log     *zap.Logger
-	storage storage.Storage
-}
-
-func NewChunkService(infoLog, errLog *zap.Logger, storage storage.Storage) *chunkService {
-
-	return &chunkService{
-		log:     infoLog,
-		storage: storage,
-	}
-}
-
-func (cs *chunkService) Serve(filename string) (io.Reader, error) {
-	chunk, err := cs.storage.Get(filename)
-	if err != nil {
+func (ss *StreamService) ServeChunk(filename string) (io.Reader, error) {
+	if !ss.chunkHandler.Exists(filename) {
 		return nil, ErrChunkNotFound
 	}
-
-	return chunk, nil
+	return ss.chunkHandler.Retrieve(filename)
 }
 
-type videoService struct {
-	log     *zap.Logger
-	storage storage.Storage
-}
-
-func NewVideoService(infoLog, errLog *zap.Logger, storage storage.Storage) *videoService {
-
-	return &videoService{
-		log:     infoLog,
-		storage: storage,
+func (ss *StreamService) ServeEntireVideo(filename string) (io.Reader, error) {
+	if !ss.videoHandler.Exists(filename) {
+		return nil, ErrVideoNotFound
 	}
+	return ss.videoHandler.Retrieve(filename)
 }
 
-func (vs *videoService) Serve(filename string) (io.Reader, error) {
-	return vs.storage.Get(filename)
+func (ss *StreamService) UploadVideo(file io.Reader, filename string) error {
+	return ss.videoHandler.Upload(file, filename)
 }
 
-func (vs *videoService) Upload(file io.Reader, filename string) error {
-	return vs.storage.Store(file, filename)
-}
-
-func (vs *videoService) Remove(filename string) error {
-	if !vs.storage.Exists(filename) {
-		return ErrVideoNotFound
+// TODO: figure out how to make this method atomic
+func (ss *StreamService) RemoveVideo(filename string) error {
+	if err := ss.videoHandler.Remove(filename); err != nil {
+		return err
 	}
-	return vs.storage.Remove(filename)
+	if err := ss.manifestHandler.Remove(filename); err != nil {
+		return err
+	}
+	if err := ss.chunkHandler.Remove(filename); err != nil {
+		return err
+	}
+	return nil
 }

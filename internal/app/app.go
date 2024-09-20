@@ -45,31 +45,19 @@ func Run() {
 		return
 	}
 
-	manifestService := service.NewManifestService(
-		infoLogger,
-		errLogger,
-		manifestStorage,
-		videoStorage,
-		chunkStorage,
-		config.Segment.Time,
-	)
+	chunkHandler := service.NewChunkHandler(infoLogger, chunkStorage)
+	manifestHandler := service.NewManifestHandler(infoLogger, manifestStorage)
+	videoHandler := service.NewVideoService(infoLogger, videoStorage)
 
-	chunkService := service.NewChunkService(
+	service := service.NewStreamService(
+		chunkHandler,
+		manifestHandler,
+		videoHandler,
 		infoLogger,
-		errLogger,
-		chunkStorage,
-	)
-
-	videoService := service.NewVideoService(
-		infoLogger,
-		errLogger,
-		videoStorage,
 	)
 
 	controller := controller.New(
-		chunkService,
-		manifestService,
-		videoService,
+		service,
 		requestLogger,
 		errLogger,
 		infoLogger,

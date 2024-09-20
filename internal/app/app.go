@@ -63,7 +63,7 @@ func Run() {
 	videoService := service.NewVideoService(
 		infoLogger,
 		errLogger,
-		chunkStorage,
+		videoStorage,
 	)
 
 	controller := controller.New(

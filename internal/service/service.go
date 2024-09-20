@@ -141,5 +141,5 @@ func (vs *videoService) Serve(filename string) (io.Reader, error) {
 }
 
 func (vs *videoService) Upload(file io.Reader) error {
-	return ErrNotImplemented
+	return vs.storage.Store(file)
 }

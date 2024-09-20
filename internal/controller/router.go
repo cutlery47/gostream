@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"io"
+	"mime/multipart"
 	"strings"
 
 	"github.com/cutlery47/gostream/internal/service"
@@ -30,32 +32,11 @@ func (r *router) getFile(c echo.Context) error {
 	c.Response().Header().Set("Access-Control-Allow-Origin", "*")
 
 	filename := c.Param("filename")
-	if strings.HasSuffix(filename, ".ts") {
-		// transport stream was requested
-		return r.serveFile(c, filename, r.chunkService)
-	} else {
-		// manifest file was requested
-		return r.serveFile(c, filename, r.manifestService)
-	}
+
+	return r.get(c, filename)
 }
 
-func (r *router) serveFile(c echo.Context, filename string, service service.Service) error {
-	// searching for requested file on the current system
-	file, err := service.Serve(filename)
-	if err != nil {
-		return r.errHandler.handle(err)
-	}
-
-	// converting the file into a sequence of bytes
-	blob, err := utils.BufferReader(file)
-	if err != nil {
-		return r.errHandler.handle(err)
-	}
-
-	// returning the file
-	return c.Blob(200, "application/mpeg", blob.Bytes())
-}
-
+// POST /api/v1/upload
 func (r *router) uploadFile(c echo.Context) error {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -68,9 +49,53 @@ func (r *router) uploadFile(c echo.Context) error {
 	}
 	defer multipart.Close()
 
-	if strings.HasSuffix(file.Filename, ".mp4") {
-		r.videoService.Upload(multipart)
+	return r.upload(c, file.Filename, multipart)
+}
+
+func (r *router) get(c echo.Context, filename string) (err error) {
+	var file io.Reader
+
+	// searching for requested file on the current system
+	if strings.HasSuffix(filename, ".ts") {
+		// transport stream was requested
+		file, err = r.chunkService.Serve(filename)
+		if err != nil {
+			return err
+		}
+	} else {
+		// manifest file was requested
+		file, err = r.manifestService.Serve(filename)
+		if err != nil {
+			return err
+		}
 	}
 
-	return echo.ErrNotImplemented
+	// converting the file into a sequence of bytes
+	blob, err := utils.BufferReader(file)
+	if err != nil {
+		return r.errHandler.handle(err)
+	}
+
+	// returning the file
+	return c.Blob(200, "application/mpeg", blob.Bytes())
+}
+
+func (r *router) upload(c echo.Context, filename string, multipart multipart.File) error {
+	if strings.HasSuffix(filename, ".mp4") {
+		if err := r.videoService.Upload(multipart); err != nil {
+			return err
+		}
+	} else if strings.HasSuffix(filename, ".ts") {
+		if err := r.chunkService.Upload(multipart); err != nil {
+			return err
+		}
+	} else if strings.HasSuffix(filename, ".m3u8") {
+		if err := r.manifestService.Upload(multipart); err != nil {
+			return err
+		}
+	} else {
+		return echo.ErrNotImplemented
+	}
+
+	return c.JSON(200, "Success")
 }

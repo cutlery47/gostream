@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/utils"
@@ -89,7 +90,16 @@ func (lvs *LocalVideoStorage) Get(filename string) (io.Reader, error) {
 }
 
 func (lcs *LocalVideoStorage) Store(file io.Reader) error {
-	return ErrNotImplemented
+	log.Println("here")
+
+	rawFile, err := utils.BufferReader(file)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	log.Println(rawFile)
+	return nil
 }
 
 func (lvs *LocalVideoStorage) Exists(filename string) bool {

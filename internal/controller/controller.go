@@ -14,11 +14,12 @@ type Controller struct {
 }
 
 func New(
-	videoService service.UploadService,
-	manifestService, chunkService service.Service,
+	chunkService service.Service,
+	manifestService service.Service,
+	videoService service.UploadRemoveService,
 	reqLog, errLog, infoLog *zap.Logger) *Controller {
 	e := echo.New()
-	r := newRouter(videoService, manifestService, chunkService, errLog)
+	r := newRouter(errLog, chunkService, manifestService, videoService)
 
 	e.Use(
 		middleware.RequestLoggerWithConfig(
@@ -48,6 +49,9 @@ func New(
 
 	// file upload
 	e.POST("api/v1/upload", r.uploadFile)
+
+	// file deletion
+	e.DELETE("api/v1/:filename", r.deleteFile)
 
 	return &Controller{
 		echo:   e,

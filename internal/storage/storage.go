@@ -12,6 +12,8 @@ type Storage interface {
 	Get(filename string) (io.Reader, error)
 	Exists(filename string) bool
 	Store(file io.Reader, filename string) error
+	Remove(filename string) error
+	// returns a path to the storage
 	Path() string
 }
 
@@ -25,23 +27,27 @@ func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
 	}
 }
 
-func (lfs *LocalManifestStorage) Get(filename string) (io.Reader, error) {
-	return os.Open(fmt.Sprintf("%v/%v", lfs.manifestPath, filename))
+func (lms *LocalManifestStorage) Get(filename string) (io.Reader, error) {
+	return os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
 }
 
-func (lfs *LocalManifestStorage) Store(file io.Reader, filename string) error {
-	return ErrNotImplemented
-}
-
-func (lfs *LocalManifestStorage) Exists(filename string) bool {
-	if _, err := os.Stat(fmt.Sprintf("%v/%v", lfs.manifestPath, filename)); err == nil {
+func (lms *LocalManifestStorage) Exists(filename string) bool {
+	if _, err := os.Stat(fmt.Sprintf("%v/%v", lms.manifestPath, filename)); err == nil {
 		return true
 	}
 	return false
 }
 
-func (lfs *LocalManifestStorage) Path() string {
-	return lfs.manifestPath
+func (lms *LocalManifestStorage) Store(file io.Reader, filename string) error {
+	return ErrNotImplemented
+}
+
+func (lms *LocalManifestStorage) Remove(filename string) error {
+	return os.Remove(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
+}
+
+func (lms *LocalManifestStorage) Path() string {
+	return lms.manifestPath
 }
 
 type LocalChunkStorage struct {
@@ -59,15 +65,21 @@ func (lcs *LocalChunkStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
 }
 
+func (lcs *LocalChunkStorage) Exists(filename string) bool {
+	chunkdir := utils.RemoveSuffix(filename, "_")
+	if _, err := os.Stat(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename)); err == nil {
+		return true
+	}
+	return false
+}
+
 func (lcs *LocalChunkStorage) Store(file io.Reader, filename string) error {
 	return ErrNotImplemented
 }
 
-func (lcs *LocalChunkStorage) Exists(filename string) bool {
-	if _, err := os.Stat(fmt.Sprintf("%v/%v", lcs.chunkPath, filename)); err == nil {
-		return true
-	}
-	return false
+func (lcs *LocalChunkStorage) Remove(filename string) error {
+	chunkdir := utils.RemoveSuffix(filename, "_")
+	return os.Remove(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
 }
 
 func (lcs *LocalChunkStorage) Path() string {
@@ -88,13 +100,20 @@ func (lvs *LocalVideoStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
 }
 
-func (lcs *LocalVideoStorage) Store(file io.Reader, filename string) error {
+func (lvs *LocalVideoStorage) Exists(filename string) bool {
+	if _, err := os.Stat(fmt.Sprintf("%v/%v", lvs.videoPath, filename)); err == nil {
+		return true
+	}
+	return false
+}
+
+func (lvs *LocalVideoStorage) Store(file io.Reader, filename string) error {
 	rawFile, err := utils.BufferReader(file)
 	if err != nil {
 		return err
 	}
 
-	newFile, err := os.Create(fmt.Sprintf("%v/%v", lcs.videoPath, filename))
+	newFile, err := os.Create(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
 	if err != nil {
 		return err
 	}
@@ -107,11 +126,8 @@ func (lcs *LocalVideoStorage) Store(file io.Reader, filename string) error {
 	return nil
 }
 
-func (lvs *LocalVideoStorage) Exists(filename string) bool {
-	if _, err := os.Stat(fmt.Sprintf("%v/%v", lvs.videoPath, filename)); err == nil {
-		return true
-	}
-	return false
+func (lvs *LocalVideoStorage) Remove(filename string) error {
+	return os.Remove(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
 }
 
 func (lvs *LocalVideoStorage) Path() string {

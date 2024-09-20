@@ -67,9 +67,9 @@ func Run() {
 	)
 
 	controller := controller.New(
-		videoService,
-		manifestService,
 		chunkService,
+		manifestService,
+		videoService,
 		requestLogger,
 		errLogger,
 		infoLogger,

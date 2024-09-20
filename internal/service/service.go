@@ -13,9 +13,18 @@ type Service interface {
 	Serve(filename string) (io.Reader, error)
 }
 
-type UploadService interface {
-	Service
+type Uploader interface {
 	Upload(file io.Reader, filename string) error
+}
+
+type Remover interface {
+	Remove(filename string) error
+}
+
+type UploadRemoveService interface {
+	Service
+	Uploader
+	Remover
 }
 
 // TODO: figure out how to isolate manifestService from chunkStorage
@@ -138,4 +147,11 @@ func (vs *videoService) Serve(filename string) (io.Reader, error) {
 
 func (vs *videoService) Upload(file io.Reader, filename string) error {
 	return vs.storage.Store(file, filename)
+}
+
+func (vs *videoService) Remove(filename string) error {
+	if !vs.storage.Exists(filename) {
+		return ErrVideoNotFound
+	}
+	return vs.storage.Remove(filename)
 }

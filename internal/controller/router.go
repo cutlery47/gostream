@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"io"
 	"mime/multipart"
 	"strings"
@@ -36,18 +35,14 @@ func (r *router) getFile(c echo.Context) error {
 
 // POST /api/v1/upload
 func (r *router) uploadFile(c echo.Context) error {
-	file, err := c.FormFile("file")
+	multipart, err := c.FormFile("file")
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
 
-	multipart, err := file.Open()
-	if err != nil {
-		return r.errHandler.handle(err)
-	}
-	defer multipart.Close()
+	filename := c.FormValue("filename")
 
-	return r.upload(c, file.Filename, multipart)
+	return r.upload(c, filename, multipart)
 }
 
 // DELETE /api/v1/:filename
@@ -91,27 +86,32 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 	return c.Blob(200, "application/mpeg", blob.Bytes())
 }
 
-func (r *router) upload(c echo.Context, filename string, multipart multipart.File) error {
-	if strings.HasSuffix(filename, ".mp4") {
-		if err := r.service.UploadVideo(multipart, filename); err != nil {
-			return r.errHandler.handle(err)
-		}
-	} else {
+func (r *router) upload(c echo.Context, filename string, multipart *multipart.FileHeader) error {
+	if !strings.HasSuffix(multipart.Filename, ".mp4") {
 		return echo.ErrUnprocessableEntity
+	}
+
+	file, err := multipart.Open()
+	if err != nil {
+		return err
+	}
+
+	filename += ".mp4"
+
+	if err := r.service.UploadVideo(file, filename); err != nil {
+		return r.errHandler.handle(err)
 	}
 
 	return c.JSON(200, "Success")
 }
 
 func (r *router) delete(c echo.Context, filename string) error {
-	if strings.HasSuffix(filename, ".mp4") {
-		if err := r.service.RemoveVideo(filename); err != nil {
-			return r.errHandler.handle(err)
-		}
-	} else {
-		if err := r.service.RemoveVideo(fmt.Sprintf("%v.mp4", filename)); err != nil {
-			return r.errHandler.handle(err)
-		}
+	if !strings.HasSuffix(filename, ".mp4") {
+		filename += ".mp4"
+	}
+
+	if err := r.service.RemoveVideo(filename); err != nil {
+		return r.errHandler.handle(err)
 	}
 
 	return c.JSON(200, "Success")

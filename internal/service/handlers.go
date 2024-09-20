@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/cutlery47/gostream/internal/storage"
@@ -49,7 +48,7 @@ func (mh *manifestHandler) Retrieve(filename string) (io.Reader, error) {
 	if !mh.storage.Exists(filename) {
 		return nil, ErrManifestNotFound
 	}
-	return mh.storage.Get(fmt.Sprintf("%v.m3u8", filename))
+	return mh.storage.Get(filename)
 }
 
 func (mh *manifestHandler) Exists(filename string) bool {

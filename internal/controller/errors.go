@@ -4,23 +4,25 @@ import (
 	"fmt"
 
 	"github.com/cutlery47/gostream/internal/service"
+	"github.com/cutlery47/gostream/internal/storage"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
 
 type errHandler struct {
 	log *zap.Logger
-	// ServiceError -> echo.HTTPError mapping
-	errMap map[*service.ServiceError]*echo.HTTPError
+	// error -> echo.HTTPError mapping
+	errMap map[error]*echo.HTTPError
 }
 
 func newErrHandler(errLog *zap.Logger) *errHandler {
-	errMap := map[*service.ServiceError]*echo.HTTPError{
+	errMap := map[error]*echo.HTTPError{
 		service.ErrChunkNotFound:         echo.ErrNotFound,
 		service.ErrManifestNotFound:      echo.ErrNotFound,
 		service.ErrVideoNotFound:         echo.ErrNotFound,
 		service.ErrSegmentationException: echo.ErrInternalServerError,
 		service.ErrNotImplemented:        echo.ErrNotImplemented,
+		storage.ErrNotImplemented:        echo.ErrNotImplemented,
 	}
 
 	return &errHandler{

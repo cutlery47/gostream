@@ -2,7 +2,7 @@ package service
 
 import (
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/cutlery47/gostream/internal/storage"
 	"github.com/cutlery47/gostream/internal/utils"
@@ -10,15 +10,14 @@ import (
 )
 
 type Service interface {
-	Serve(filename string) (*os.File, error)
-	Upload(file *os.File) error
+	Serve(filename string) (io.Reader, error)
+	Upload(file io.Reader) error
 }
 
 // TODO: figure out how to isolate manifestService from chunkStorage
 
 type manifestService struct {
 	log          *zap.Logger
-	errHander    errHandler
 	manStorage   storage.Storage
 	vidStorage   storage.Storage
 	chunkStorage storage.Storage // trash
@@ -27,13 +26,9 @@ type manifestService struct {
 }
 
 func NewManifestService(infoLog, errLog *zap.Logger, manStorage, vidStorage, chunkStorage storage.Storage, segTime int) *manifestService {
-	errHandler := errHandler{
-		log: errLog,
-	}
 
 	return &manifestService{
 		log:          infoLog,
-		errHander:    errHandler,
 		manStorage:   manStorage,
 		vidStorage:   vidStorage,
 		chunkStorage: chunkStorage,
@@ -41,7 +36,7 @@ func NewManifestService(infoLog, errLog *zap.Logger, manStorage, vidStorage, chu
 	}
 }
 
-func (ms *manifestService) Serve(filename string) (*os.File, error) {
+func (ms *manifestService) Serve(filename string) (io.Reader, error) {
 	// check if we already store the manifest file
 	manifest, err := ms.manStorage.Get(fmt.Sprintf("%v.m3u8", filename))
 	if err != nil {
@@ -59,7 +54,7 @@ func (ms *manifestService) Serve(filename string) (*os.File, error) {
 	return ms.createManifest(filename)
 }
 
-func (ms *manifestService) createManifest(filename string) (*os.File, error) {
+func (ms *manifestService) createManifest(filename string) (io.Reader, error) {
 	chunkDir := ms.chunkStorage.Path()
 	manDir := ms.manStorage.Path()
 	vidDir := ms.vidStorage.Path()
@@ -98,29 +93,24 @@ func (ms *manifestService) checkOrCreateDirs(chunkDir, manDir, filename string) 
 	utils.MKDir(manDir).Run()                                   // manifest dir
 }
 
-func (ms *manifestService) Upload(file *os.File) error {
+func (ms *manifestService) Upload(file io.Reader) error {
 	return ErrNotImplemented
 }
 
 type chunkService struct {
-	log        *zap.Logger
-	errHandler errHandler
-	storage    storage.Storage
+	log     *zap.Logger
+	storage storage.Storage
 }
 
 func NewChunkService(infoLog, errLog *zap.Logger, storage storage.Storage) *chunkService {
-	errHandler := errHandler{
-		log: errLog,
-	}
 
 	return &chunkService{
-		log:        infoLog,
-		errHandler: errHandler,
-		storage:    storage,
+		log:     infoLog,
+		storage: storage,
 	}
 }
 
-func (cs *chunkService) Serve(filename string) (*os.File, error) {
+func (cs *chunkService) Serve(filename string) (io.Reader, error) {
 	chunk, err := cs.storage.Get(filename)
 	if err != nil {
 		return nil, ErrChunkNotFound
@@ -129,9 +119,27 @@ func (cs *chunkService) Serve(filename string) (*os.File, error) {
 	return chunk, nil
 }
 
-func (cs *chunkService) Upload(file *os.File) error {
+func (cs *chunkService) Upload(file io.Reader) error {
 	return ErrNotImplemented
 }
 
 type videoService struct {
+	log     *zap.Logger
+	storage storage.Storage
+}
+
+func NewVideoService(infoLog, errLog *zap.Logger, storage storage.Storage) *videoService {
+
+	return &videoService{
+		log:     infoLog,
+		storage: storage,
+	}
+}
+
+func (vs *videoService) Serve(filename string) (io.Reader, error) {
+	return nil, ErrNotImplemented
+}
+
+func (vs *videoService) Upload(file io.Reader) error {
+	return ErrNotImplemented
 }

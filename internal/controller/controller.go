@@ -13,9 +13,9 @@ type Controller struct {
 	log    *zap.Logger
 }
 
-func New(manifestService, chunkService service.Service, reqLog, errLog, infoLog *zap.Logger) *Controller {
+func New(manifestService, chunkService, videoService service.Service, reqLog, errLog, infoLog *zap.Logger) *Controller {
 	e := echo.New()
-	r := newRouter(manifestService, chunkService, errLog)
+	r := newRouter(manifestService, chunkService, videoService, errLog)
 
 	e.Use(
 		middleware.RequestLoggerWithConfig(

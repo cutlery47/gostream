@@ -2,14 +2,16 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/utils"
 )
 
 type Storage interface {
-	Get(filename string) (*os.File, error)
+	Get(filename string) (io.Reader, error)
 	Exists(filename string) bool
+	Store(file io.Reader) error
 	Path() string
 }
 
@@ -23,8 +25,12 @@ func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
 	}
 }
 
-func (lfs *LocalManifestStorage) Get(filename string) (*os.File, error) {
+func (lfs *LocalManifestStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v", lfs.manifestPath, filename))
+}
+
+func (lfs *LocalManifestStorage) Store(file io.Reader) error {
+	return ErrNotImplemented
 }
 
 func (lfs *LocalManifestStorage) Exists(filename string) bool {
@@ -48,9 +54,13 @@ func NewLocalChunkStorage(chunkPath string) *LocalChunkStorage {
 	}
 }
 
-func (lcs *LocalChunkStorage) Get(filename string) (*os.File, error) {
+func (lcs *LocalChunkStorage) Get(filename string) (io.Reader, error) {
 	chunkdir := utils.RemoveSuffix(filename, "_")
 	return os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
+}
+
+func (lcs *LocalChunkStorage) Store(file io.Reader) error {
+	return ErrNotImplemented
 }
 
 func (lcs *LocalChunkStorage) Exists(filename string) bool {
@@ -74,8 +84,12 @@ func NewLocalVideoStorage(videoPath string) *LocalVideoStorage {
 	}
 }
 
-func (lvs *LocalVideoStorage) Get(filename string) (*os.File, error) {
+func (lvs *LocalVideoStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
+}
+
+func (lcs *LocalVideoStorage) Store(file io.Reader) error {
+	return ErrNotImplemented
 }
 
 func (lvs *LocalVideoStorage) Exists(filename string) bool {

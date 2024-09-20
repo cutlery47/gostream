@@ -60,9 +60,16 @@ func Run() {
 		chunkStorage,
 	)
 
+	videoService := service.NewVideoService(
+		infoLogger,
+		errLogger,
+		chunkStorage,
+	)
+
 	controller := controller.New(
 		manifestService,
 		chunkService,
+		videoService,
 		requestLogger,
 		errLogger,
 		infoLogger,

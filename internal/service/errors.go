@@ -2,8 +2,6 @@ package service
 
 import (
 	"errors"
-
-	"go.uber.org/zap"
 )
 
 var (
@@ -25,11 +23,3 @@ func newServiceError(message string) *ServiceError {
 }
 
 func (se ServiceError) Error() string { return se.err.Error() }
-
-type errHandler struct {
-	log *zap.Logger
-}
-
-func (eh errHandler) Handle(err error) {
-
-}

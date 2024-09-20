@@ -12,13 +12,15 @@ import (
 type router struct {
 	manifestService service.Service
 	chunkService    service.Service
+	videoService    service.Service
 	errHandler      errHandler
 }
 
-func newRouter(manifestService, chunkService service.Service, errLog *zap.Logger) *router {
+func newRouter(manifestService, chunkService, videoService service.Service, errLog *zap.Logger) *router {
 	return &router{
 		manifestService: manifestService,
 		chunkService:    chunkService,
+		videoService:    videoService,
 		errHandler:      *newErrHandler(errLog),
 	}
 }
@@ -45,7 +47,7 @@ func (r *router) serveFile(c echo.Context, filename string, service service.Serv
 	}
 
 	// converting the file into a sequence of bytes
-	blob, err := utils.BufferFile(file)
+	blob, err := utils.BufferReader(file)
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
@@ -55,5 +57,20 @@ func (r *router) serveFile(c echo.Context, filename string, service service.Serv
 }
 
 func (r *router) uploadFile(c echo.Context) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return r.errHandler.handle(err)
+	}
+
+	multipart, err := file.Open()
+	if err != nil {
+		return r.errHandler.handle(err)
+	}
+	defer multipart.Close()
+
+	if strings.HasSuffix(file.Filename, ".mp4") {
+		r.videoService.Upload(multipart)
+	}
+
 	return echo.ErrNotImplemented
 }

@@ -12,13 +12,16 @@ import (
 )
 
 type router struct {
+	videoService    service.UploadService
 	manifestService service.Service
 	chunkService    service.Service
-	videoService    service.Service
 	errHandler      errHandler
 }
 
-func newRouter(manifestService, chunkService, videoService service.Service, errLog *zap.Logger) *router {
+func newRouter(
+	videoService service.UploadService,
+	manifestService, chunkService service.Service,
+	errLog *zap.Logger) *router {
 	return &router{
 		manifestService: manifestService,
 		chunkService:    chunkService,
@@ -62,6 +65,12 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 		if err != nil {
 			return err
 		}
+	} else if strings.HasSuffix(filename, ".mp4") {
+		// entire file was requested
+		file, err = r.videoService.Serve(filename)
+		if err != nil {
+			return err
+		}
 	} else {
 		// manifest file was requested
 		file, err = r.manifestService.Serve(filename)
@@ -82,15 +91,7 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 
 func (r *router) upload(c echo.Context, filename string, multipart multipart.File) error {
 	if strings.HasSuffix(filename, ".mp4") {
-		if err := r.videoService.Upload(multipart); err != nil {
-			return err
-		}
-	} else if strings.HasSuffix(filename, ".ts") {
-		if err := r.chunkService.Upload(multipart); err != nil {
-			return err
-		}
-	} else if strings.HasSuffix(filename, ".m3u8") {
-		if err := r.manifestService.Upload(multipart); err != nil {
+		if err := r.videoService.Upload(multipart, filename); err != nil {
 			return err
 		}
 	} else {

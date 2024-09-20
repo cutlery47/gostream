@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/utils"
@@ -12,7 +11,7 @@ import (
 type Storage interface {
 	Get(filename string) (io.Reader, error)
 	Exists(filename string) bool
-	Store(file io.Reader) error
+	Store(file io.Reader, filename string) error
 	Path() string
 }
 
@@ -30,7 +29,7 @@ func (lfs *LocalManifestStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v", lfs.manifestPath, filename))
 }
 
-func (lfs *LocalManifestStorage) Store(file io.Reader) error {
+func (lfs *LocalManifestStorage) Store(file io.Reader, filename string) error {
 	return ErrNotImplemented
 }
 
@@ -60,7 +59,7 @@ func (lcs *LocalChunkStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
 }
 
-func (lcs *LocalChunkStorage) Store(file io.Reader) error {
+func (lcs *LocalChunkStorage) Store(file io.Reader, filename string) error {
 	return ErrNotImplemented
 }
 
@@ -89,16 +88,22 @@ func (lvs *LocalVideoStorage) Get(filename string) (io.Reader, error) {
 	return os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
 }
 
-func (lcs *LocalVideoStorage) Store(file io.Reader) error {
-	log.Println("here")
-
+func (lcs *LocalVideoStorage) Store(file io.Reader, filename string) error {
 	rawFile, err := utils.BufferReader(file)
 	if err != nil {
-		log.Println(err)
 		return err
 	}
 
-	log.Println(rawFile)
+	newFile, err := os.Create(fmt.Sprintf("%v/%v", lcs.videoPath, filename))
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(newFile, rawFile)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

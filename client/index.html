@@ -1,0 +1,19 @@
+<html>
+    <head>
+        <title>HTTP Live Streaming Example</title>
+        <link href="https://vjs.zencdn.net/8.16.1/video-js.css" rel="stylesheet"/>
+    </head>
+    <body>
+        <video 
+        id="my-video"
+        class="video-js"
+        controls
+        preload="auto"
+        width="640"
+        height="264"
+        data-setup="{}">
+            <source src="http://127.0.0.1:8080/api/v1/xyeta" type="application/x-mpegURL">
+        </video>
+        <script src="https://vjs.zencdn.net/8.16.1/video.min.js"></script>
+    </body>
+</html>

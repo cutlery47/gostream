@@ -28,11 +28,11 @@ func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
 }
 
 func (lms *LocalManifestStorage) Get(filename string) (io.Reader, error) {
-	return os.Open(fmt.Sprintf("%v/%v.m3u8", lms.manifestPath, filename))
+	return os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
 }
 
 func (lms *LocalManifestStorage) Exists(filename string) bool {
-	if _, err := os.Stat(fmt.Sprintf("%v/%v.m3u8", lms.manifestPath, filename)); err == nil {
+	if _, err := os.Stat(fmt.Sprintf("%v/%v", lms.manifestPath, filename)); err == nil {
 		return true
 	}
 	return false
@@ -43,7 +43,7 @@ func (lms *LocalManifestStorage) Store(file io.Reader, filename string) error {
 }
 
 func (lms *LocalManifestStorage) Remove(filename string) error {
-	return os.Remove(fmt.Sprintf("%v/%v.m3u8", lms.manifestPath, filename))
+	return os.Remove(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
 }
 
 func (lms *LocalManifestStorage) Path() string {
@@ -78,8 +78,7 @@ func (lcs *LocalChunkStorage) Store(file io.Reader, filename string) error {
 }
 
 func (lcs *LocalChunkStorage) Remove(filename string) error {
-	chunkdir := utils.RemoveSuffix(filename, "_")
-	return os.Remove(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
+	return os.RemoveAll(fmt.Sprintf("%v/%v", lcs.chunkPath, filename))
 }
 
 func (lcs *LocalChunkStorage) Path() string {

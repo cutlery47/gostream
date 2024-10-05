@@ -40,8 +40,8 @@ func NewStreamService(
 // TODO: add chunk checks
 func (ss *StreamService) ServeManifest(filename string) (io.Reader, error) {
 	// check if we already store the manifest file
-	if manifest, _ := ss.manifestHandler.Retrieve(filename); manifest != nil {
-		ss.log.Info("Manifest for %v is already stored. Returning...")
+	if manifest, _ := ss.manifestHandler.Retrieve(filename + ".m3u8"); manifest != nil {
+		ss.log.Info(fmt.Sprintf("Manifest for %v is already stored. Returning...", filename))
 		return manifest, nil
 	}
 
@@ -51,12 +51,11 @@ func (ss *StreamService) ServeManifest(filename string) (io.Reader, error) {
 	}
 
 	chunkDir := ss.chunkHandler.Path()
-	chunkFileDir := fmt.Sprintf("%v/%v", ss.chunkHandler.Path(), filename)
+	chunkFileDir := fmt.Sprintf("%v/%v", chunkDir, filename)
 	manifestDir := ss.manifestHandler.Path()
 	videoDir := ss.videoHandler.Path()
 
 	ss.createDirs(chunkDir, chunkFileDir, manifestDir, videoDir)
-
 	cmd := utils.SegmentVideoAndCreateManifest(
 		// precise file path
 		fmt.Sprintf("%v/%v.mp4", videoDir, filename),
@@ -67,18 +66,21 @@ func (ss *StreamService) ServeManifest(filename string) (io.Reader, error) {
 	)
 
 	// check if segmentation went smoothely
-	if _, err := cmd.Output(); err != nil {
-		return nil, err
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, ErrSegmentationException
 	}
 
-	return ss.manifestHandler.Retrieve(filename)
+	ss.log.Error(string(out))
+
+	return ss.manifestHandler.Retrieve(filename + ".m3u8")
 }
 
 func (ss *StreamService) createDirs(chunkDir, chunkFileDir, manifestDir, videoDir string) {
-	utils.MKDir(chunkDir)
-	utils.MKDir(chunkFileDir)
-	utils.MKDir(manifestDir)
-	utils.MKDir(videoDir)
+	utils.MKDir(chunkDir).Run()
+	utils.MKDir(chunkFileDir).Run()
+	utils.MKDir(manifestDir).Run()
+	utils.MKDir(videoDir).Run()
 }
 
 func (ss *StreamService) ServeChunk(filename string) (io.Reader, error) {
@@ -99,16 +101,19 @@ func (ss *StreamService) UploadVideo(file io.Reader, filename string) error {
 	return ss.videoHandler.Upload(file, filename)
 }
 
-// TODO: figure out how to make this method atomic
-func (ss *StreamService) RemoveVideo(filename string) error {
-	if err := ss.videoHandler.Remove(filename); err != nil {
-		return err
-	}
-	if err := ss.manifestHandler.Remove(filename); err != nil {
-		return err
-	}
-	if err := ss.chunkHandler.Remove(filename); err != nil {
-		return err
+func (ss *StreamService) RemoveVideo(filename string) (err error) {
+	if ss.videoHandler.Exists(filename + ".mp4") {
+		if err = ss.videoHandler.Remove(filename + ".mp4"); err != nil {
+			ss.log.Error(err.Error())
+		}
+		if err = ss.chunkHandler.Remove(filename); err != nil {
+			ss.log.Error(err.Error())
+		}
+		if err = ss.manifestHandler.Remove(filename + ".m3u8"); err != nil {
+			ss.log.Error(err.Error())
+		}
+	} else {
+		return ErrVideoNotFound
 	}
 	return nil
 }

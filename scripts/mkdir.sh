@@ -6,5 +6,4 @@ if [ -d $DIR ]; then
     exit 0
 else 
     mkdir $DIR
-    exit 0
 fi

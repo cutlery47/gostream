@@ -93,8 +93,9 @@ func (ch *chunkHandler) Path() string {
 	return ch.storage.Path()
 }
 
+// removes all contents of a chunk directory with a filename
 func (ch *chunkHandler) Remove(filename string) error {
-	return ErrNotImplemented
+	return ch.storage.Remove(filename)
 }
 
 type videoHandler struct {
@@ -102,7 +103,7 @@ type videoHandler struct {
 	storage storage.Storage
 }
 
-func NewVideoService(infoLog *zap.Logger, storage storage.Storage) *videoHandler {
+func NewVideoHandler(infoLog *zap.Logger, storage storage.Storage) *videoHandler {
 	return &videoHandler{
 		log:     infoLog,
 		storage: storage,

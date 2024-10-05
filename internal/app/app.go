@@ -47,7 +47,7 @@ func Run() {
 
 	chunkHandler := service.NewChunkHandler(infoLogger, chunkStorage)
 	manifestHandler := service.NewManifestHandler(infoLogger, manifestStorage)
-	videoHandler := service.NewVideoService(infoLogger, videoStorage)
+	videoHandler := service.NewVideoHandler(infoLogger, videoStorage)
 
 	service := service.NewStreamService(
 		chunkHandler,

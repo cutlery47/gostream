@@ -16,9 +16,7 @@ type router struct {
 	errHandler errHandler
 }
 
-func newRouter(
-	errLog *zap.Logger,
-	service service.Service) *router {
+func newRouter(errLog *zap.Logger, service service.Service) *router {
 	return &router{
 		service:    service,
 		errHandler: *newErrHandler(errLog),
@@ -59,21 +57,16 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 	if strings.HasSuffix(filename, ".ts") {
 		// transport stream was requested
 		file, err = r.service.ServeChunk(filename)
-		if err != nil {
-			return r.errHandler.handle(err)
-		}
 	} else if strings.HasSuffix(filename, ".mp4") {
 		// entire file was requested
 		file, err = r.service.ServeEntireVideo(filename)
-		if err != nil {
-			return r.errHandler.handle(err)
-		}
 	} else {
 		// manifest file was requested
 		file, err = r.service.ServeManifest(filename)
-		if err != nil {
-			return r.errHandler.handle(err)
-		}
+	}
+
+	if err != nil {
+		return r.errHandler.handle(err)
 	}
 
 	// converting the file into a sequence of bytes
@@ -87,6 +80,7 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 }
 
 func (r *router) upload(c echo.Context, filename string, multipart *multipart.FileHeader) error {
+	// check if attached file is of mp4 format
 	if !strings.HasSuffix(multipart.Filename, ".mp4") {
 		return echo.ErrUnprocessableEntity
 	}
@@ -106,10 +100,6 @@ func (r *router) upload(c echo.Context, filename string, multipart *multipart.Fi
 }
 
 func (r *router) delete(c echo.Context, filename string) error {
-	if !strings.HasSuffix(filename, ".mp4") {
-		filename += ".mp4"
-	}
-
 	if err := r.service.RemoveVideo(filename); err != nil {
 		return r.errHandler.handle(err)
 	}

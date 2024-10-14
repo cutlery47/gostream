@@ -7,6 +7,8 @@ import (
 	"github.com/cutlery47/gostream/internal/controller"
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/cutlery47/gostream/internal/storage"
+	"github.com/cutlery47/gostream/internal/storage/obj"
+	"github.com/cutlery47/gostream/internal/storage/repo"
 	"github.com/cutlery47/gostream/pkg/logger"
 	"github.com/cutlery47/gostream/pkg/server"
 )
@@ -14,8 +16,7 @@ import (
 func Run() {
 	config, err := config.New()
 	if err != nil {
-		log.Printf("error when loading config: %v", err)
-		return
+		log.Fatal("error when loading config:", err)
 	}
 
 	requestLogger := logger.New(config.Log.RequestLogsPath, false)
@@ -28,8 +29,7 @@ func Run() {
 	defer infoLogger.Sync()
 
 	if errLogger == nil || requestLogger == nil || infoLogger == nil {
-		log.Println("logger paths should be fully provided")
-		return
+		log.Fatal("logger paths should be fully provided")
 	}
 
 	var manifestStorage storage.Storage
@@ -41,7 +41,17 @@ func Run() {
 		chunkStorage = storage.NewLocalChunkStorage(config.Storage.Local.ChunkPath)
 		videoStorage = storage.NewLocalVideoStorage(config.Storage.Local.VideoPath)
 	} else {
-		log.Println("the only implemented storage type is local (so far)")
+		fileRepository, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		s3, err := obj.NewS3(config.Storage.Distr.S3Config)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		manifestStorage = storage.NewDistributedManifestStorage(fileRepository, s3)
 		return
 	}
 

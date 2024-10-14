@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log"
 	"mime/multipart"
 	"strings"
 
@@ -68,6 +69,8 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
+
+	log.Println(file.Raw)
 
 	// converting the file into a sequence of bytes
 	blob, err := utils.BufferReader(file.Raw)

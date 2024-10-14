@@ -22,12 +22,29 @@ type loggerConfig struct {
 type storageConfig struct {
 	StorageType string
 	Local       localStorageConfig
+	Distr       distrStorageConfig
 }
 
 type localStorageConfig struct {
 	ManifestPath string
 	ChunkPath    string
 	VideoPath    string
+}
+
+type distrStorageConfig struct {
+	S3Config S3Config
+	DBConfig DBConfig
+}
+
+type DBConfig struct {
+	User     string
+	Password string
+	Host     string
+	Port     string
+	DBName   string
+}
+
+type S3Config struct {
 }
 
 type segmentConfig struct {

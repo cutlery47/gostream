@@ -13,23 +13,27 @@ import (
 )
 
 type Storage interface {
+	// returns file by name
 	Get(fileName string) (*schema.OutFile, error)
+	// checks if file exists
 	Exists(fileName string) bool
+	// stores file
 	Store(file schema.InFile) error
+	// removes file by name
 	Remove(fileName string) error
 	// returns a path to the storage
 	Path() string
 }
 
 type DistributedManifestStorage struct {
-	repository repo.Repository
-	s3         obj.S3
+	repo repo.CreateReadDeleteRepository
+	s3   obj.ObjectStorage
 }
 
-func NewDistributedManifestStorage(repository repo.Repository, s3 obj.S3) *DistributedManifestStorage {
+func NewDistributedManifestStorage(repository repo.CreateReadDeleteRepository, s3 obj.ObjectStorage) *DistributedManifestStorage {
 	return &DistributedManifestStorage{
-		repository: repository,
-		s3:         s3,
+		repo: repository,
+		s3:   s3,
 	}
 }
 
@@ -42,31 +46,119 @@ func (dms DistributedManifestStorage) Store(file schema.InFile) error {
 		ETag:       "xyu",
 	}
 
-	if err := dms.repository.Create(repoFile); err != nil {
+	if err := dms.repo.Create(repoFile); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (DistributedManifestStorage) Get(fileName string) (*schema.OutFile, error) {
+func (dms DistributedManifestStorage) Get(fileName string) (*schema.OutFile, error) {
 	return nil, ErrNotImplemented
 }
 
-func (DistributedManifestStorage) Exists(fileName string) bool {
+func (dms DistributedManifestStorage) Exists(fileName string) bool {
 	return false
 }
 
-func (DistributedManifestStorage) Remove(fileName string) error {
+func (dms DistributedManifestStorage) Remove(fileName string) error {
 	return ErrNotImplemented
 }
 
-func (DistributedManifestStorage) Path() string {
+func (dms DistributedManifestStorage) Path() string {
+	return ""
+}
+
+type DistributedVideoStorage struct {
+	repo repo.CreateReadDeleteRepository
+	s3   obj.ObjectStorage
+}
+
+func NewDistributedVideoStorage(repository repo.CreateReadDeleteRepository, s3 obj.ObjectStorage) *DistributedVideoStorage {
+	return &DistributedVideoStorage{
+		repo: repository,
+		s3:   s3,
+	}
+}
+
+func (dvs DistributedVideoStorage) Store(file schema.InFile) error {
+	repoFile := repo.InRepositoryFile{
+		Name:       file.Name,
+		Size:       file.Size,
+		UploadedAt: time.Now(),
+		BucketName: "tmp",
+		ETag:       "xyu",
+	}
+
+	if err := dvs.repo.Create(repoFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dvs DistributedVideoStorage) Get(fileName string) (*schema.OutFile, error) {
+	return nil, ErrNotImplemented
+}
+
+func (dvs DistributedVideoStorage) Exists(fileName string) bool {
+	return false
+}
+
+func (dvs DistributedVideoStorage) Remove(fileName string) error {
+	return ErrNotImplemented
+}
+
+func (dvs DistributedVideoStorage) Path() string {
 	return ""
 }
 
 type LocalManifestStorage struct {
 	manifestPath string
+}
+
+type DistributedChunkStorage struct {
+	repo repo.CreateReadDeleteRepository
+	s3   obj.ObjectStorage
+}
+
+func NewDistributedChunkStorage(repository repo.CreateReadDeleteRepository, s3 obj.ObjectStorage) *DistributedChunkStorage {
+	return &DistributedChunkStorage{
+		repo: repository,
+		s3:   s3,
+	}
+}
+
+func (dcs DistributedChunkStorage) Store(file schema.InFile) error {
+	repoFile := repo.InRepositoryFile{
+		Name:       file.Name,
+		Size:       file.Size,
+		UploadedAt: time.Now(),
+		BucketName: "tmp",
+		ETag:       "xyu",
+	}
+
+	if err := dcs.repo.Create(repoFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dvs DistributedChunkStorage) Get(fileName string) (*schema.OutFile, error) {
+	return nil, ErrNotImplemented
+}
+
+func (dvs DistributedChunkStorage) Exists(fileName string) bool {
+	return false
+}
+
+func (dvs DistributedChunkStorage) Remove(fileName string) error {
+	return ErrNotImplemented
+}
+
+func (dvs DistributedChunkStorage) Path() string {
+	return ""
 }
 
 func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
@@ -76,12 +168,12 @@ func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
 }
 
 func (lms *LocalManifestStorage) Get(fileName string) (*schema.OutFile, error) {
-	_, err := os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, fileName))
+	fd, err := os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, fileName))
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	return &schema.OutFile{Raw: fd}, nil
 }
 
 func (lms *LocalManifestStorage) Exists(filename string) bool {
@@ -115,12 +207,12 @@ func NewLocalChunkStorage(chunkPath string) *LocalChunkStorage {
 
 func (lcs *LocalChunkStorage) Get(filename string) (*schema.OutFile, error) {
 	chunkdir := utils.RemoveSuffix(filename, "_")
-	_, err := os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
+	fd, err := os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	return &schema.OutFile{Raw: fd}, nil
 }
 
 func (lcs *LocalChunkStorage) Exists(filename string) bool {
@@ -154,12 +246,12 @@ func NewLocalVideoStorage(videoPath string) *LocalVideoStorage {
 }
 
 func (lvs *LocalVideoStorage) Get(filename string) (*schema.OutFile, error) {
-	_, err := os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
+	fd, err := os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	return &schema.OutFile{Raw: fd}, nil
 }
 
 func (lvs *LocalVideoStorage) Exists(filename string) bool {

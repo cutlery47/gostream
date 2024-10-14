@@ -113,6 +113,7 @@ func (vh *videoHandler) Retrieve(filename string) (*schema.OutFile, error) {
 	if !vh.storage.Exists(filename) {
 		return nil, ErrVideoNotFound
 	}
+
 	return vh.storage.Get(filename)
 }
 

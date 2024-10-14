@@ -1,10 +1,10 @@
 package controller
 
 import (
-	"io"
 	"mime/multipart"
 	"strings"
 
+	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/cutlery47/gostream/internal/utils"
 	"github.com/labstack/echo/v4"
@@ -51,7 +51,7 @@ func (r *router) deleteFile(c echo.Context) error {
 }
 
 func (r *router) get(c echo.Context, filename string) (err error) {
-	var file io.Reader
+	var file *schema.OutFile
 
 	// searching for requested file on the current system
 	if strings.HasSuffix(filename, ".ts") {
@@ -70,7 +70,7 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 	}
 
 	// converting the file into a sequence of bytes
-	blob, err := utils.BufferReader(file)
+	blob, err := utils.BufferReader(file.Raw)
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
@@ -92,7 +92,13 @@ func (r *router) upload(c echo.Context, filename string, multipart *multipart.Fi
 
 	filename += ".mp4"
 
-	if err := r.service.UploadVideo(file, filename); err != nil {
+	inFile := schema.InFile{
+		Raw:  file,
+		Name: filename,
+		Size: int(multipart.Size),
+	}
+
+	if err := r.service.UploadVideo(inFile); err != nil {
 		return r.errHandler.handle(err)
 	}
 

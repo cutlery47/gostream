@@ -1,20 +1,19 @@
 package service
 
 import (
-	"io"
-
+	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/storage"
 	"go.uber.org/zap"
 )
 
 type Retriever interface {
-	Retrieve(filename string) (io.Reader, error)
+	Retrieve(filename string) (*schema.OutFile, error)
 	Exists(filename string) bool
 	Path() string
 }
 
 type Uploader interface {
-	Upload(file io.Reader, filename string) error
+	Upload(file schema.InFile) error
 }
 
 type Remover interface {
@@ -44,7 +43,7 @@ func NewManifestHandler(log *zap.Logger, storage storage.Storage) *manifestHandl
 	}
 }
 
-func (mh *manifestHandler) Retrieve(filename string) (io.Reader, error) {
+func (mh *manifestHandler) Retrieve(filename string) (*schema.OutFile, error) {
 	if !mh.storage.Exists(filename) {
 		return nil, ErrManifestNotFound
 	}
@@ -78,7 +77,7 @@ func NewChunkHandler(infoLog *zap.Logger, storage storage.Storage) *chunkHandler
 	}
 }
 
-func (ch *chunkHandler) Retrieve(filename string) (io.Reader, error) {
+func (ch *chunkHandler) Retrieve(filename string) (*schema.OutFile, error) {
 	if !ch.storage.Exists(filename) {
 		return nil, ErrChunkNotFound
 	}
@@ -110,7 +109,7 @@ func NewVideoHandler(infoLog *zap.Logger, storage storage.Storage) *videoHandler
 	}
 }
 
-func (vh *videoHandler) Retrieve(filename string) (io.Reader, error) {
+func (vh *videoHandler) Retrieve(filename string) (*schema.OutFile, error) {
 	if !vh.storage.Exists(filename) {
 		return nil, ErrVideoNotFound
 	}
@@ -125,8 +124,8 @@ func (vh *videoHandler) Path() string {
 	return vh.storage.Path()
 }
 
-func (vh *videoHandler) Upload(file io.Reader, filename string) error {
-	return vh.storage.Store(file, filename)
+func (vh *videoHandler) Upload(file schema.InFile) error {
+	return vh.storage.Store(file)
 }
 
 func (vh *videoHandler) Remove(filename string) error {

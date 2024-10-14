@@ -2,17 +2,17 @@ package service
 
 import (
 	"fmt"
-	"io"
 
+	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
 
 type Service interface {
-	ServeManifest(filename string) (io.Reader, error)
-	ServeChunk(filename string) (io.Reader, error)
-	ServeEntireVideo(filename string) (io.Reader, error)
-	UploadVideo(file io.Reader, filename string) error
+	ServeManifest(filename string) (*schema.OutFile, error)
+	ServeChunk(filename string) (*schema.OutFile, error)
+	ServeEntireVideo(filename string) (*schema.OutFile, error)
+	UploadVideo(file schema.InFile) error
 	RemoveVideo(filename string) error
 }
 
@@ -38,7 +38,7 @@ func NewStreamService(
 }
 
 // TODO: add chunk checks
-func (ss *StreamService) ServeManifest(filename string) (io.Reader, error) {
+func (ss *StreamService) ServeManifest(filename string) (*schema.OutFile, error) {
 	// check if we already store the manifest file
 	if manifest, _ := ss.manifestHandler.Retrieve(filename + ".m3u8"); manifest != nil {
 		ss.log.Info(fmt.Sprintf("Manifest for %v is already stored. Returning...", filename))
@@ -83,22 +83,22 @@ func (ss *StreamService) createDirs(chunkDir, chunkFileDir, manifestDir, videoDi
 	utils.MKDir(videoDir).Run()
 }
 
-func (ss *StreamService) ServeChunk(filename string) (io.Reader, error) {
+func (ss *StreamService) ServeChunk(filename string) (*schema.OutFile, error) {
 	if !ss.chunkHandler.Exists(filename) {
 		return nil, ErrChunkNotFound
 	}
 	return ss.chunkHandler.Retrieve(filename)
 }
 
-func (ss *StreamService) ServeEntireVideo(filename string) (io.Reader, error) {
+func (ss *StreamService) ServeEntireVideo(filename string) (*schema.OutFile, error) {
 	if !ss.videoHandler.Exists(filename) {
 		return nil, ErrVideoNotFound
 	}
 	return ss.videoHandler.Retrieve(filename)
 }
 
-func (ss *StreamService) UploadVideo(file io.Reader, filename string) error {
-	return ss.videoHandler.Upload(file, filename)
+func (ss *StreamService) UploadVideo(file schema.InFile) error {
+	return ss.videoHandler.Upload(file)
 }
 
 func (ss *StreamService) RemoveVideo(filename string) (err error) {

@@ -4,17 +4,65 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
+	"github.com/cutlery47/gostream/internal/schema"
+	"github.com/cutlery47/gostream/internal/storage/obj"
+	"github.com/cutlery47/gostream/internal/storage/repo"
 	"github.com/cutlery47/gostream/internal/utils"
 )
 
 type Storage interface {
-	Get(filename string) (io.Reader, error)
-	Exists(filename string) bool
-	Store(file io.Reader, filename string) error
-	Remove(filename string) error
+	Get(fileName string) (*schema.OutFile, error)
+	Exists(fileName string) bool
+	Store(file schema.InFile) error
+	Remove(fileName string) error
 	// returns a path to the storage
 	Path() string
+}
+
+type DistributedManifestStorage struct {
+	repository repo.Repository
+	s3         obj.S3
+}
+
+func NewDistributedManifestStorage(repository repo.Repository, s3 obj.S3) *DistributedManifestStorage {
+	return &DistributedManifestStorage{
+		repository: repository,
+		s3:         s3,
+	}
+}
+
+func (dms DistributedManifestStorage) Store(file schema.InFile) error {
+	repoFile := repo.InRepositoryFile{
+		Name:       file.Name,
+		Size:       file.Size,
+		UploadedAt: time.Now(),
+		BucketName: "tmp",
+		ETag:       "xyu",
+	}
+
+	if err := dms.repository.Create(repoFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (DistributedManifestStorage) Get(fileName string) (*schema.OutFile, error) {
+	return nil, ErrNotImplemented
+}
+
+func (DistributedManifestStorage) Exists(fileName string) bool {
+	return false
+}
+
+func (DistributedManifestStorage) Remove(fileName string) error {
+	return ErrNotImplemented
+}
+
+func (DistributedManifestStorage) Path() string {
+	return ""
 }
 
 type LocalManifestStorage struct {
@@ -27,8 +75,13 @@ func NewLocalManifestStorage(manifestPath string) *LocalManifestStorage {
 	}
 }
 
-func (lms *LocalManifestStorage) Get(filename string) (io.Reader, error) {
-	return os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
+func (lms *LocalManifestStorage) Get(fileName string) (*schema.OutFile, error) {
+	_, err := os.Open(fmt.Sprintf("%v/%v", lms.manifestPath, fileName))
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func (lms *LocalManifestStorage) Exists(filename string) bool {
@@ -38,12 +91,12 @@ func (lms *LocalManifestStorage) Exists(filename string) bool {
 	return false
 }
 
-func (lms *LocalManifestStorage) Store(file io.Reader, filename string) error {
+func (lms *LocalManifestStorage) Store(file schema.InFile) error {
 	return ErrNotImplemented
 }
 
-func (lms *LocalManifestStorage) Remove(filename string) error {
-	return os.Remove(fmt.Sprintf("%v/%v", lms.manifestPath, filename))
+func (lms *LocalManifestStorage) Remove(fileName string) error {
+	return os.Remove(fmt.Sprintf("%v/%v", lms.manifestPath, fileName))
 }
 
 func (lms *LocalManifestStorage) Path() string {
@@ -60,9 +113,14 @@ func NewLocalChunkStorage(chunkPath string) *LocalChunkStorage {
 	}
 }
 
-func (lcs *LocalChunkStorage) Get(filename string) (io.Reader, error) {
+func (lcs *LocalChunkStorage) Get(filename string) (*schema.OutFile, error) {
 	chunkdir := utils.RemoveSuffix(filename, "_")
-	return os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
+	_, err := os.Open(fmt.Sprintf("%v/%v/%v", lcs.chunkPath, chunkdir, filename))
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func (lcs *LocalChunkStorage) Exists(filename string) bool {
@@ -73,7 +131,7 @@ func (lcs *LocalChunkStorage) Exists(filename string) bool {
 	return false
 }
 
-func (lcs *LocalChunkStorage) Store(file io.Reader, filename string) error {
+func (lcs *LocalChunkStorage) Store(file schema.InFile) error {
 	return ErrNotImplemented
 }
 
@@ -95,8 +153,13 @@ func NewLocalVideoStorage(videoPath string) *LocalVideoStorage {
 	}
 }
 
-func (lvs *LocalVideoStorage) Get(filename string) (io.Reader, error) {
-	return os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
+func (lvs *LocalVideoStorage) Get(filename string) (*schema.OutFile, error) {
+	_, err := os.Open(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func (lvs *LocalVideoStorage) Exists(filename string) bool {
@@ -106,17 +169,19 @@ func (lvs *LocalVideoStorage) Exists(filename string) bool {
 	return false
 }
 
-func (lvs *LocalVideoStorage) Store(file io.Reader, filename string) error {
-	rawFile, err := utils.BufferReader(file)
+func (lvs *LocalVideoStorage) Store(file schema.InFile) error {
+	rawFile, err := utils.BufferReader(file.Raw)
 	if err != nil {
 		return err
 	}
 
-	newFile, err := os.Create(fmt.Sprintf("%v/%v", lvs.videoPath, filename))
+	// creating a new file on a local system
+	newFile, err := os.Create(fmt.Sprintf("%v/%v", lvs.videoPath, file.Name))
 	if err != nil {
 		return err
 	}
 
+	// copying data to the file
 	_, err = io.Copy(newFile, rawFile)
 	if err != nil {
 		return err

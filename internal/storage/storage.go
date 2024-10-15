@@ -20,19 +20,24 @@ type Storage interface {
 	Remove(filename string) error
 	// checks if file exists
 	Exists(filename string) bool
+	// returns local paths
+	Paths() Paths
 }
 
 type DistibutedStorage struct {
-	log  *zap.Logger
 	repo repo.Repository
 	s3   obj.ObjectStorage
+
+	log   *zap.Logger
+	paths Paths
 }
 
-func NewDistibutedStorage(log *zap.Logger, repo repo.Repository, s3 obj.ObjectStorage) *DistibutedStorage {
+func NewDistibutedStorage(log *zap.Logger, paths Paths, repo repo.Repository, s3 obj.ObjectStorage) *DistibutedStorage {
 	return &DistibutedStorage{
-		log:  log,
-		repo: repo,
-		s3:   s3,
+		repo:  repo,
+		s3:    s3,
+		log:   log,
+		paths: paths,
 	}
 }
 
@@ -65,6 +70,8 @@ func (ds *DistibutedStorage) Store(video, manifest schema.InFile, chunks []schem
 	for i, el := range chunks {
 		repoChunks = append(repoChunks, el.ToRepo(chunksBucketNames[i], chunksETags[i]))
 	}
+
+	// remove local files here
 
 	return ds.repo.CreateAll(repoVid, repoMan, repoChunks)
 }
@@ -109,19 +116,19 @@ func (ds *DistibutedStorage) Exists(filename string) bool {
 	return true
 }
 
-type LocalStorage struct {
-	log          *zap.Logger
-	videoPath    string
-	chunkPath    string
-	manifestPath string
+func (ds DistibutedStorage) Paths() Paths {
+	return ds.paths
 }
 
-func NewLocalStorage(log *zap.Logger, videoPath, chunkPath, manifestPath string) *LocalStorage {
+type LocalStorage struct {
+	log   *zap.Logger
+	paths Paths
+}
+
+func NewLocalStorage(log *zap.Logger, paths Paths) *LocalStorage {
 	return &LocalStorage{
-		log:          log,
-		videoPath:    videoPath,
-		chunkPath:    chunkPath,
-		manifestPath: manifestPath,
+		log:   log,
+		paths: paths,
 	}
 }
 
@@ -167,16 +174,34 @@ func (ls *LocalStorage) Exists(filename string) bool {
 	return false
 }
 
+func (ls *LocalStorage) Paths() Paths {
+	return ls.paths
+}
+
 func (ls *LocalStorage) determinePath(filename string) (filePath string, err error) {
 	if strings.HasSuffix(filename, ".mp4") {
-		filePath = fmt.Sprintf("%v/%v", ls.videoPath, filename)
+		filePath = fmt.Sprintf("%v/%v", ls.paths.VidPath, filename)
 	} else if strings.HasSuffix(filename, ".m3u8") {
-		filePath = fmt.Sprintf("%v/%v", ls.manifestPath, filename)
+		filePath = fmt.Sprintf("%v/%v", ls.paths.ManPath, filename)
 	} else if strings.HasSuffix(filename, ".ts") {
-		filePath = fmt.Sprintf("%v/%v", ls.chunkPath, filename)
+		filePath = fmt.Sprintf("%v/%v", ls.paths.ChunkPath, filename)
 	} else {
 		return filePath, fmt.Errorf("unsupported file format")
 	}
 
 	return filePath, nil
+}
+
+type Paths struct {
+	VidPath   string
+	ManPath   string
+	ChunkPath string
+}
+
+func InitPaths(vidPath, manPath, chunkPath string) Paths {
+	return Paths{
+		VidPath:   vidPath,
+		ManPath:   manPath,
+		ChunkPath: chunkPath,
+	}
 }

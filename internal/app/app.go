@@ -34,13 +34,14 @@ func Run() {
 
 	var store storage.Storage
 
+	paths := storage.Paths{
+		VidPath:   config.Storage.Local.VideoPath,
+		ManPath:   config.Storage.Local.ManifestPath,
+		ChunkPath: config.Storage.Local.ChunkPath,
+	}
+
 	if config.Storage.StorageType == "local" {
-		store = storage.NewLocalStorage(
-			errLogger,
-			config.Storage.Local.VideoPath,
-			config.Storage.Local.ChunkPath,
-			config.Storage.Local.ManifestPath,
-		)
+		store = storage.NewLocalStorage(errLogger, paths)
 	} else {
 		repo, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
 		if err != nil {
@@ -52,7 +53,7 @@ func Run() {
 			log.Fatal(err)
 		}
 
-		store = storage.NewDistibutedStorage(infoLogger, repo, s3)
+		store = storage.NewDistibutedStorage(infoLogger, paths, repo, s3)
 	}
 
 	manifestService := service.NewManifestService(infoLogger)

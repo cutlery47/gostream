@@ -32,16 +32,17 @@ func Run() {
 		log.Fatal("logger paths should be fully provided")
 	}
 
-	var manifestStorage storage.Storage
-	var chunkStorage storage.Storage
-	var videoStorage storage.Storage
+	var store storage.Storage
 
 	if config.Storage.StorageType == "local" {
-		manifestStorage = storage.NewLocalManifestStorage(config.Storage.Local.ManifestPath)
-		chunkStorage = storage.NewLocalChunkStorage(config.Storage.Local.ChunkPath)
-		videoStorage = storage.NewLocalVideoStorage(config.Storage.Local.VideoPath)
+		store = storage.NewLocalStorage(
+			errLogger,
+			config.Storage.Local.VideoPath,
+			config.Storage.Local.ChunkPath,
+			config.Storage.Local.ManifestPath,
+		)
 	} else {
-		fileRepository, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
+		repo, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -51,19 +52,15 @@ func Run() {
 			log.Fatal(err)
 		}
 
-		manifestStorage = storage.NewDistributedManifestStorage(fileRepository, s3)
-		return
+		store = storage.NewDistibutedStorage(infoLogger, repo, s3)
 	}
 
-	chunkHandler := service.NewChunkHandler(infoLogger, chunkStorage)
-	manifestHandler := service.NewManifestHandler(infoLogger, manifestStorage)
-	videoHandler := service.NewVideoHandler(infoLogger, videoStorage)
+	manifestService := service.NewManifestService(infoLogger)
 
 	service := service.NewStreamService(
-		chunkHandler,
-		manifestHandler,
-		videoHandler,
 		infoLogger,
+		store,
+		manifestService,
 	)
 
 	controller := controller.New(

@@ -54,21 +54,37 @@ type segmentConfig struct {
 func New() (*Config, error) {
 	godotenv.Load(".env")
 
+	logConfig := loggerConfig{
+		RequestLogsPath: os.Getenv("REQUEST_LOGS_PATH"),
+		ErrorLogsPath:   os.Getenv("ERROR_LOGS_PATH"),
+		InfoLogsPath:    os.Getenv("INFO_LOGS_PATH"),
+	}
+
 	lsConfig := localStorageConfig{
 		ManifestPath: os.Getenv("MANIFEST_PATH"),
 		ChunkPath:    os.Getenv("CHUNK_PATH"),
 		VideoPath:    os.Getenv("VIDEO_PATH"),
 	}
 
+	s3Config := S3Config{}
+
+	dbConfig := DBConfig{
+		User:     os.Getenv("DB_USER"),
+		Password: os.Getenv("DB_PASSWORD"),
+		Host:     os.Getenv("DB_HOST"),
+		Port:     os.Getenv("DB_PORT"),
+		DBName:   os.Getenv("DB_NAME"),
+	}
+
+	dsConfig := distrStorageConfig{
+		S3Config: s3Config,
+		DBConfig: dbConfig,
+	}
+
 	sConfig := storageConfig{
 		StorageType: os.Getenv("STORAGE_TYPE"),
 		Local:       lsConfig,
-	}
-
-	logConfig := loggerConfig{
-		RequestLogsPath: os.Getenv("REQUEST_LOGS_PATH"),
-		ErrorLogsPath:   os.Getenv("ERROR_LOGS_PATH"),
-		InfoLogsPath:    os.Getenv("INFO_LOGS_PATH"),
+		Distr:       dsConfig,
 	}
 
 	segtime, err := strconv.Atoi(os.Getenv("SEGMENT_TIME"))

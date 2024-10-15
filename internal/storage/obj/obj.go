@@ -8,22 +8,32 @@ import (
 )
 
 type ObjectStorage interface {
-	Store(file S3File) error
+	Store(file S3File) (string, string, error)
+	StoreMultiple(files ...S3File) ([]string, []string, error)
 	Get(filename string) (*S3File, error)
+	Delete(filename string) (*S3File, error)
 }
 
 type S3 struct {
 	conn net.Conn
 }
 
-func (s3 S3) Store(file S3File) error {
-	return fmt.Errorf("fdsfd")
+func NewS3(conf config.S3Config) (*S3, error) {
+	return &S3{}, nil
+}
+
+func (s3 S3) Store(files S3File) (string, string, error) {
+	return "", "", fmt.Errorf("fdsfd")
 }
 
 func (s3 S3) Get(filename string) (*S3File, error) {
 	return nil, fmt.Errorf("sdafasdf")
 }
 
-func NewS3(conf config.S3Config) (*S3, error) {
-	return &S3{}, nil
+func (s3 S3) Delete(filename string) (*S3File, error) {
+	return nil, fmt.Errorf("xyu yxu")
+}
+
+func (s3 S3) StoreMultiple(file ...S3File) ([]string, []string, error) {
+	return []string{}, []string{}, fmt.Errorf("sfkasdf")
 }

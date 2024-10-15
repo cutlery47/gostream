@@ -8,31 +8,19 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type CreateReadDeleteRepository interface {
-	Create(file InRepositoryFile) error
-	Get(filename string) (*RepositoryFile, error)
-	Delete(filename string) error
+type Repository interface {
+	CreateAll(video, manifest InRepositoryFile, chunks []InRepositoryFile) error
+	Read(filename string) (*RepositoryFile, error)
+	Delete(filename string) (*RepositoryFile, error)
 }
 
 type FileRepository struct {
-	CreateReadDeleteRepository
 	db *sql.DB
-}
-
-func (fr FileRepository) Create(file InRepositoryFile) error {
-	return fmt.Errorf("xyu")
-}
-
-func (fr FileRepository) Get(filename string) (*RepositoryFile, error) {
-	return nil, fmt.Errorf("xyu3")
-}
-
-func (fr FileRepository) Delete(filename string) error {
-	return fmt.Errorf("xyu2")
 }
 
 func NewFileRepository(conf config.DBConfig) (*FileRepository, error) {
 	connStr := fmt.Sprintf("postgres://%v:%v@%v:%v/%v", conf.User, conf.Password, conf.Host, conf.Port, conf.DBName)
+	// openning db connection
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("error when connecting to db: %v", err)
@@ -41,47 +29,53 @@ func NewFileRepository(conf config.DBConfig) (*FileRepository, error) {
 	return &FileRepository{db: db}, nil
 }
 
-type ManifestRepository struct {
-	fileRepo *FileRepository
+func (fr *FileRepository) CreateAll(video, manifest InRepositoryFile, chunks []InRepositoryFile) error {
+	return fmt.Errorf("123123")
 }
 
-func NewManifestRepository(conf config.DBConfig) (*ManifestRepository, error) {
-	fileRepo, err := NewFileRepository(conf)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ManifestRepository{
-		fileRepo: fileRepo,
-	}, nil
+func (fr *FileRepository) Read(filename string) (*RepositoryFile, error) {
+	return nil, fmt.Errorf("xyu3")
 }
 
-type VideoRepository struct {
-	fileRepo *FileRepository
+func (fr *FileRepository) Delete(filename string) (*RepositoryFile, error) {
+	return nil, fmt.Errorf("xyu2")
 }
 
-func NewVideoRepository(conf config.DBConfig) (*VideoRepository, error) {
-	fileRepo, err := NewFileRepository(conf)
-	if err != nil {
-		return nil, err
-	}
+// type ManifestRepository struct {
+// 	*FileRepository
+// }
 
-	return &VideoRepository{
-		fileRepo: fileRepo,
-	}, nil
-}
+// func NewManifestRepository(conf config.DBConfig) (*ManifestRepository, error) {
+// 	fileRepo, err := NewFileRepository(conf)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-type ChunkRepository struct {
-	fileRepo *FileRepository
-}
+// 	return &ManifestRepository{fileRepo}, nil
+// }
 
-func NewChunkRepository(conf config.DBConfig) (*ChunkRepository, error) {
-	fileRepo, err := NewFileRepository(conf)
-	if err != nil {
-		return nil, err
-	}
+// type VideoRepository struct {
+// 	*FileRepository
+// }
 
-	return &ChunkRepository{
-		fileRepo: fileRepo,
-	}, nil
-}
+// func NewVideoRepository(conf config.DBConfig) (*VideoRepository, error) {
+// 	fileRepo, err := NewFileRepository(conf)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &VideoRepository{fileRepo}, nil
+// }
+
+// type ChunkRepository struct {
+// 	*FileRepository
+// }
+
+// func NewChunkRepository(conf config.DBConfig) (*ChunkRepository, error) {
+// 	fileRepo, err := NewFileRepository(conf)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &ChunkRepository{fileRepo}, nil
+// }

@@ -11,6 +11,8 @@
 *.ts
 *.m3u8
 *.txt
+data/minio
+data/postgres
 
 # Test binary, built with `go test -c`
 *.test

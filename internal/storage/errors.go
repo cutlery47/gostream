@@ -3,7 +3,8 @@ package storage
 import "errors"
 
 var (
-	ErrNotImplemented = newStorageError("feature is not yet implemented")
+	ErrNotImplemented        = newStorageError("feature is not yet implemented")
+	ErrUnsupportedFileFormat = newStorageError("unsupported file format")
 )
 
 type StorageError struct {

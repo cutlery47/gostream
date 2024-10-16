@@ -8,9 +8,11 @@ import (
 	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/storage/obj"
 	"github.com/cutlery47/gostream/internal/storage/repo"
+	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
 
+// abstracts out file manipulation
 type Storage interface {
 	// stores files
 	Store(video, manifest schema.InFile, chunks []schema.InFile) error
@@ -24,24 +26,27 @@ type Storage interface {
 	Paths() Paths
 }
 
+// db + obj storage based storage
 type DistibutedStorage struct {
 	repo repo.Repository
 	s3   obj.ObjectStorage
 
-	log   *zap.Logger
-	paths Paths
+	infoLog *zap.Logger
+	errLog  *zap.Logger
+	paths   Paths
 }
 
-func NewDistibutedStorage(log *zap.Logger, paths Paths, repo repo.Repository, s3 obj.ObjectStorage) *DistibutedStorage {
+func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo repo.Repository, s3 obj.ObjectStorage) *DistibutedStorage {
 	return &DistibutedStorage{
-		repo:  repo,
-		s3:    s3,
-		log:   log,
-		paths: paths,
+		repo:    repo,
+		s3:      s3,
+		infoLog: infoLog,
+		errLog:  errLog,
+		paths:   paths,
 	}
 }
 
-// make s3 uploads "transaactional"
+// todo: make s3 uploads "transaactional"
 func (ds *DistibutedStorage) Store(video, manifest schema.InFile, chunks []schema.InFile) error {
 	vidS3 := obj.S3File{Raw: video.Raw}
 	vidBucketName, vidETag, err := ds.s3.Store(vidS3)
@@ -120,15 +125,16 @@ func (ds DistibutedStorage) Paths() Paths {
 	return ds.paths
 }
 
+// local file system based storage
 type LocalStorage struct {
-	log   *zap.Logger
-	paths Paths
+	errLog *zap.Logger
+	paths  Paths
 }
 
-func NewLocalStorage(log *zap.Logger, paths Paths) *LocalStorage {
+func NewLocalStorage(errLog *zap.Logger, paths Paths) *LocalStorage {
 	return &LocalStorage{
-		log:   log,
-		paths: paths,
+		errLog: errLog,
+		paths:  paths,
 	}
 }
 
@@ -163,7 +169,7 @@ func (ls *LocalStorage) Remove(filename string) error {
 func (ls *LocalStorage) Exists(filename string) bool {
 	filePath, err := ls.determinePath(filename)
 	if err != nil {
-		ls.log.Error(err.Error())
+		ls.errLog.Error(err.Error())
 		return false
 	}
 
@@ -178,30 +184,25 @@ func (ls *LocalStorage) Paths() Paths {
 	return ls.paths
 }
 
+// used to detect where given file is stored
 func (ls *LocalStorage) determinePath(filename string) (filePath string, err error) {
 	if strings.HasSuffix(filename, ".mp4") {
 		filePath = fmt.Sprintf("%v/%v", ls.paths.VidPath, filename)
 	} else if strings.HasSuffix(filename, ".m3u8") {
 		filePath = fmt.Sprintf("%v/%v", ls.paths.ManPath, filename)
 	} else if strings.HasSuffix(filename, ".ts") {
-		filePath = fmt.Sprintf("%v/%v", ls.paths.ChunkPath, filename)
+		subdir := utils.RemoveSuffix(filename, "_")
+		filePath = fmt.Sprintf("%v/%v/%v", ls.paths.ChunkPath, subdir, filename)
 	} else {
-		return filePath, fmt.Errorf("unsupported file format")
+		return filePath, ErrUnsupportedFileFormat
 	}
 
 	return filePath, nil
 }
 
+// structure for storing paths to local files
 type Paths struct {
 	VidPath   string
 	ManPath   string
 	ChunkPath string
-}
-
-func InitPaths(vidPath, manPath, chunkPath string) Paths {
-	return Paths{
-		VidPath:   vidPath,
-		ManPath:   manPath,
-		ChunkPath: chunkPath,
-	}
 }

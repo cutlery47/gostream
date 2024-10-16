@@ -11,8 +11,15 @@ func RemoveSuffix(str string, sep string) string {
 	res := ""
 
 	slice := strings.Split(str, sep)
+	// string doesn't have sep
+	if len(slice) == 1 {
+		return slice[0]
+	}
+
 	// removing the suffix
-	slice = (slice)[:len(slice)-1]
+	slice = slice[:len(slice)-1]
+
+	// assembling the leftovers
 	for _, el := range slice {
 		res += el
 	}

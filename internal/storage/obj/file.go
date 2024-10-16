@@ -1,7 +1,9 @@
 package obj
 
-import "io"
+import (
+	"io"
+)
 
 type S3File struct {
-	Raw io.Reader
+	Raw io.ReadCloser
 }

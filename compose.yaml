@@ -1,0 +1,27 @@
+services:
+  minio:
+    container_name: minio-service
+    image: minio/minio
+    ports:
+      - '${MINIO_PORT}:9000'
+      - '${MINIO_ADMIN_PORT}:9001'
+    env_file: '.env'
+    volumes:
+      - '${MINIO_DATA_DIR}:/minio/data'
+      - '${MINIO_LOGS_DIR}:/minio/logs'
+    command: server /minio/data --console-address ":9001"    
+
+  postgres:
+    container_name: postgres-service
+    image: postgres:latest
+    ports:
+      - '${POSTGRES_PORT}:5432'
+    env_file: '.env'
+    environment:
+      PGDATA: /postgres/data
+    volumes:
+      - '${POSTGRES_DATA_DIR}:/postgres/data'
+      - '${POSTGRES_LOGS_DIR}:/postgres/logs'
+    command: ["postgres", "-c", "logging_collector=on", "-c", "log_directory=/postgres/logs", "-c", "log_filename=postgres.log", "-c", "log_statement=all"]
+    
+

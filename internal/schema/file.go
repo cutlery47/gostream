@@ -8,7 +8,7 @@ import (
 )
 
 type InFile struct {
-	Raw  io.Reader
+	Raw  io.ReadCloser
 	Name string
 	Size int
 }
@@ -24,5 +24,5 @@ func (f InFile) ToRepo(bucketName, eTag string) repo.InRepositoryFile {
 }
 
 type OutFile struct {
-	Raw io.Reader
+	Raw io.ReadCloser
 }

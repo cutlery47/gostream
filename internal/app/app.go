@@ -53,10 +53,10 @@ func Run() {
 			log.Fatal(err)
 		}
 
-		store = storage.NewDistibutedStorage(infoLogger, paths, repo, s3)
+		store = storage.NewDistibutedStorage(infoLogger, errLogger, paths, repo, s3)
 	}
 
-	manifestService := service.NewManifestService(infoLogger)
+	manifestService := service.NewManifestService(infoLogger, errLogger)
 
 	service := service.NewStreamService(
 		infoLogger,

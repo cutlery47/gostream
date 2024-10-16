@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/storage"
@@ -18,7 +19,7 @@ type FileService interface {
 
 // service for creating manifest file and .ts chunks
 type CreatorService interface {
-	Create(vidPath, manPath, chunkPath, filename string) (manifest schema.InFile, chunks []schema.InFile, err error)
+	Create(vidPath, manPath, chunkPath string, file schema.InFile) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
 }
 
 // FileService impl
@@ -39,12 +40,12 @@ func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService C
 func (ss *StreamService) Upload(video schema.InFile) error {
 	// figuring out where to store files locally
 	paths := ss.storage.Paths()
-	manifest, chunks, err := ss.creatorService.Create(paths.VidPath, paths.ManPath, paths.ChunkPath, video.Name)
+	manifest, chunks, err := ss.creatorService.Create(paths.VidPath, paths.ManPath, paths.ChunkPath, video)
 	if err != nil {
 		return err
 	}
 
-	return ss.storage.Store(video, manifest, chunks)
+	return ss.storage.Store(video, *manifest, *chunks)
 }
 
 func (ss *StreamService) Remove(filename string) error {
@@ -57,38 +58,85 @@ func (ss *StreamService) Serve(filename string) (*schema.OutFile, error) {
 
 // CreateService impl
 type ManifestService struct {
-	log *zap.Logger
+	errLog  *zap.Logger
+	infoLog *zap.Logger
 }
 
-func NewManifestService(log *zap.Logger) *ManifestService {
+func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
 	return &ManifestService{
-		log: log,
+		errLog:  errLog,
+		infoLog: infoLog,
 	}
 }
 
-func (ms *ManifestService) Create(vidPath, manPath, chunkPath, filename string) (manifest schema.InFile, chunks []schema.InFile, err error) {
+func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schema.InFile) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
 	// create necessary directories if don't exist
-	ms.createDirs(vidPath, manPath, chunkPath, filename)
+	ms.createDirs(vidPath, manPath, chunkPath, file.Name)
+
+	preciseVidPath := fmt.Sprintf("%v/%v.mp4", vidPath, file.Name)
+	preciseManPath := fmt.Sprintf("%v/%v.m3u8", manPath, file.Name)
+	preciseChunkDir := fmt.Sprintf("%v/%v/", chunkPath, file.Name)
+
+	// reading raw .mp4 video file
+	fileData := make([]byte, file.Size)
+	if _, err := file.Raw.Read(fileData); err != nil {
+		ms.errLog.Error(err.Error())
+	}
+
+	// creating .mp4 video file locally
+	if err := os.WriteFile(fmt.Sprintf("%v/%v.mp4", vidPath, file.Name), fileData, 0664); err != nil {
+		ms.errLog.Error(err.Error())
+	}
 
 	// segmentation + .m3u8 creation
+	// results in manifest file and chunks creation
 	cmd := utils.SegmentVideoAndCreateManifest(
-		// precise file path
-		fmt.Sprintf("%v/%v.mp4", vidPath, filename),
+		preciseVidPath,
 		// precise manifest path
-		fmt.Sprintf("%v/%v.m3u8", manPath, filename),
+		preciseManPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", chunkPath, filename),
+		fmt.Sprintf("%v/%v_%%4d.ts", preciseChunkDir, file.Name),
 	)
 
 	// check if segmentation went smoothely
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return schema.InFile{}, []schema.InFile{}, ErrSegmentationException
+		ms.infoLog.Info(string(out))
+		return nil, nil, ErrSegmentationException
 	}
 
-	ms.log.Info(string(out))
+	// creating containers for manifest and chunks
+	manifest = &schema.InFile{}
+	chunks = &[]schema.InFile{}
 
-	return schema.InFile{}, []schema.InFile{}, nil
+	// retrieving manifest data
+	manifestFile, _ := os.Open(preciseManPath)
+	manifestStat, _ := manifestFile.Stat()
+
+	// filling up manifest container
+	manifest.Raw = manifestFile
+	manifest.Name = manifestStat.Name()
+	manifest.Size = int(manifestStat.Size())
+
+	// itrating over each chunk in the local directory
+	chunkFiles, _ := os.ReadDir(preciseChunkDir)
+	// filling up chunk array
+	for _, chunk := range chunkFiles {
+		// retrieving chunk data
+		chunkName := chunk.Name()
+		chunkFile, _ := os.Open(preciseChunkDir + chunkName)
+		chunkStat, _ := chunkFile.Stat()
+
+		// filling up chunk container
+		chunkEl := schema.InFile{}
+		chunkEl.Name = chunkName
+		chunkEl.Raw = chunkFile
+		chunkEl.Size = int(chunkStat.Size())
+
+		*chunks = append(*chunks, chunkEl)
+	}
+
+	return manifest, chunks, nil
 }
 
 func (ss *ManifestService) createDirs(vidPath, manPath, chunkPath, filename string) {

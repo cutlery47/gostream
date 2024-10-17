@@ -11,8 +11,8 @@
 *.ts
 *.m3u8
 *.txt
-data/minio
-data/postgres
+
+docker/logs
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,4 +28,5 @@ go.work
 go.work.sum
 
 # env file
-.env
+*.env
+.vscode

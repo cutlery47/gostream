@@ -1,0 +1,16 @@
+FROM postgres:latest
+
+ARG GID
+
+# create a group, resempling the one on the host machine
+RUN addgroup --gid $GID gnonroot
+# add postgres user to the group
+RUN usermod -aG gnonroot postgres
+
+RUN mkdir /logs
+
+# assign rights to postgres user
+RUN chown 999:$GID /logs
+RUN chmod 777 /logs
+
+USER 999:$GID

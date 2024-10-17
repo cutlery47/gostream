@@ -29,7 +29,7 @@ func Run() {
 	defer infoLogger.Sync()
 
 	if errLogger == nil || requestLogger == nil || infoLogger == nil {
-		log.Fatal("logger paths should be fully provided")
+		log.Fatal("all loggers should be properly configured")
 	}
 
 	var store storage.Storage

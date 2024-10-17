@@ -1,27 +1,38 @@
 services:
-  minio:
-    container_name: minio-service
-    image: minio/minio
-    ports:
-      - '${MINIO_PORT}:9000'
-      - '${MINIO_ADMIN_PORT}:9001'
-    env_file: '.env'
-    volumes:
-      - '${MINIO_DATA_DIR}:/minio/data'
-      - '${MINIO_LOGS_DIR}:/minio/logs'
-    command: server /minio/data --console-address ":9001"    
+  # minio:
+  #   container_name: minio-service
+  #   image: minio/minio
+  #   user: 1000:1000 # host machine non-root user
+  #   ports:
+  #     - '${MINIO_PORT}:9000'
+  #     - '${MINIO_ADMIN_PORT}:9001'
+  #   env_file: '.env'
+  #   volumes:
+  #     - '${MINIO_DATA_DIR}:/data:z'
+  #     - '${MINIO_LOGS_DIR}:/logs:z'
+  #   command: server /minio/data --console-address ":9001"    
 
   postgres:
     container_name: postgres-service
-    image: postgres:latest
+    image: gostream-postgres-image:latest
+    user: 999:999 # default postgres user
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.postgres
+      tags:
+      - "gostream-postgres-image:latest"
     ports:
       - '${POSTGRES_PORT}:5432'
-    env_file: '.env'
+    env_file: 'yours.env'
     environment:
-      PGDATA: /postgres/data
+      PGDATA: /var/lib/postgresql/data
     volumes:
-      - '${POSTGRES_DATA_DIR}:/postgres/data'
-      - '${POSTGRES_LOGS_DIR}:/postgres/logs'
-    command: ["postgres", "-c", "logging_collector=on", "-c", "log_directory=/postgres/logs", "-c", "log_filename=postgres.log", "-c", "log_statement=all"]
+      - 'postgres_data:/var/lib/postgresql/data'
+      - '${POSTGRES_LOGS_DIR}:/logs'
+    command: ["postgres", "-c", "logging_collector=on", "-c", "log_directory=/logs", "-c", "log_filename=postgres.log", "-c", "log_statement=all"]
     
-
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local

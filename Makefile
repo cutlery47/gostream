@@ -12,8 +12,9 @@ build:
 
 up:
 	mkdir -p $(POSTGRES_LOGS_DIR)
+	mkdir -p $(MINIO_LOGS_DIR)
 	chmod 777 $(POSTGRES_LOGS_DIR)
-	docker compose --env-file yours.env up
+	docker compose --env-file yours.env up -d
 
 down:
 	docker compose --env-file yours.env down

@@ -19,9 +19,9 @@ func Run() {
 		log.Fatal("error when loading config:", err)
 	}
 
-	requestLogger := logger.New(config.Log.RequestLogsPath, false)
-	errLogger := logger.New(config.Log.ErrorLogsPath, true)
-	infoLogger := logger.New(config.Log.InfoLogsPath, false)
+	requestLogger := logger.New(config.Log.AppLogsPath+"/request.log", false)
+	errLogger := logger.New(config.Log.AppLogsPath+"/error.log", true)
+	infoLogger := logger.New(config.Log.AppLogsPath+"/info.log", false)
 
 	// flushing any remaining data
 	defer requestLogger.Sync()

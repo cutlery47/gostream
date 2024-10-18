@@ -5,7 +5,9 @@ shell = /bin/bash
 user = $(shell whoami)
 gid = $(shell id -g $(user))
 
-postgres_logs_dir = 
+run:
+	mkdir -p $(APP_LOGS_PATH)
+	go run cmd/main.go
 
 build:
 	docker build -f "docker/Dockerfile.postgres" -t "gostream-postgres-image" --build-arg GID=$(gid) .

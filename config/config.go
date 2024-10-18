@@ -14,9 +14,7 @@ type Config struct {
 }
 
 type loggerConfig struct {
-	RequestLogsPath string
-	ErrorLogsPath   string
-	InfoLogsPath    string
+	AppLogsPath string
 }
 
 type storageConfig struct {
@@ -52,12 +50,10 @@ type segmentConfig struct {
 }
 
 func New() (*Config, error) {
-	godotenv.Load(".env")
+	godotenv.Load("yours.env")
 
 	logConfig := loggerConfig{
-		RequestLogsPath: os.Getenv("REQUEST_LOGS_PATH"),
-		ErrorLogsPath:   os.Getenv("ERROR_LOGS_PATH"),
-		InfoLogsPath:    os.Getenv("INFO_LOGS_PATH"),
+		AppLogsPath: os.Getenv("APP_LOGS_PATH"),
 	}
 
 	lsConfig := localStorageConfig{

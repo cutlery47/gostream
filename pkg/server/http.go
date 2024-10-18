@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultAdress          = "127.0.0.1:8080"
+	defaultAdress          = "0.0.0.0:8080"
 	defaultReadTimeout     = 3 * time.Second
 	defaultWriteTimeout    = 3 * time.Second
 	defaultShutdownTimeout = 3 * time.Second

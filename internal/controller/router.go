@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"io"
+	"log"
 	"mime/multipart"
 	"strings"
 
@@ -97,6 +99,19 @@ func (r *router) delete(c echo.Context, filename string) error {
 	if err := r.service.Remove(filename); err != nil {
 		return r.errHandler.handle(err)
 	}
+
+	return c.JSON(200, "Success")
+}
+
+func (r *router) getMinioLogs(c echo.Context) error {
+	body := c.Request().Body
+
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return r.errHandler.handle(err)
+	}
+
+	log.Println(string(bodyBytes))
 
 	return c.JSON(200, "Success")
 }

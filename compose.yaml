@@ -2,7 +2,8 @@ services:
   minio:
     container_name: minio-service
     image: minio/minio
-    user: 1000:1000 # host machine non-root user
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - '${MINIO_PORT}:9000'
       - '${MINIO_ADMIN_PORT}:9001'
@@ -10,7 +11,7 @@ services:
     volumes:
       - 'minio_data:/data'
       - '${MINIO_LOGS_DIR}:/logs'
-    command: server /minio/data --console-address ":9001"    
+    command: server /data --console-address ":9001"    
 
   postgres:
     container_name: postgres-service

@@ -16,10 +16,19 @@ up:
 	mkdir -p $(POSTGRES_LOGS_DIR)
 	mkdir -p $(MINIO_LOGS_DIR)
 	chmod 777 $(POSTGRES_LOGS_DIR)
-	docker compose --env-file yours.env up -d
+	docker compose --env-file yours.env up
 
 down:
 	docker compose --env-file yours.env down
+
+fulldown:
+	docker compose --env-file yours.env down
+	docker volume rm gostream_postgres_data
+	docker volume rm gostream_minio_data
+
+prune:
+	docker volume rm gostream_postgres_data
+	docker volume rm gostream_minio_data
 
 unbuild:
 	docker rmi gostream-postgres-image

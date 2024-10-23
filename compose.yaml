@@ -25,12 +25,11 @@ services:
       - '${POSTGRES_PORT}:5432'
     env_file: 'yours.env'
     environment:
-      PGDATA: /var/lib/postgresql/data
+      PGDATA: /var/lib/postgresql/data/gostream
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
       - './docker/postgres/postgresql.conf:/var/lib/postgresql/data/postgresql.conf'
       - '${POSTGRES_LOGS_DIR}:/logs'
-    command: ["postgres", "-c", "config_file=/var/lib/postgresql/data/postgresql.conf"]
     
 volumes:
   postgres_data:

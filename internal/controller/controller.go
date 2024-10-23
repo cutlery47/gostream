@@ -51,9 +51,6 @@ func New(
 	// file deletion
 	e.DELETE("api/v1/:filename", r.deleteFile)
 
-	// minio logging webhook
-	e.POST("api/v1/minio-logs", r.getMinioLogs)
-
 	return &Controller{
 		echo:   e,
 		router: r,

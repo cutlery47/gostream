@@ -1,6 +1,4 @@
-CREATE DATABASE :DB_NAME
-
-\connect :DB_NAME
+CREATE DATABASE gostream;
 
 CREATE SCHEMA file_schema;
 

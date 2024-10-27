@@ -48,25 +48,26 @@ func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo repo.Re
 
 // todo: make s3 uploads "transactional"
 func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error {
-	fmt.Printf("vid: %+v\nman: %+v\nchunks: %+v\n", video, manifest, chunks)
-
+	// storing initial video in s3
 	vidS3 := obj.FromSchema(video.File)
 	vidLocation, err := ds.s3.Store(vidS3)
 	if err != nil {
 		return err
 	}
 
+	// storing manifest in s3
 	manS3 := obj.FromSchema(manifest)
 	manLocation, err := ds.s3.Store(manS3)
 	if err != nil {
 		return err
 	}
 
+	// storing manifests in s3
 	chunksS3 := []obj.InFile{}
 	for _, chunk := range chunks {
 		chunksS3 = append(chunksS3, obj.FromSchema(chunk))
 	}
-	chunksLocations, err := ds.s3.StoreMultiple(chunksS3...)
+	chunkLocations, err := ds.s3.StoreMultiple(chunksS3...)
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile,
 	repoMan := manifest.ToRepo(manLocation)
 	repoChunks := []repo.InFile{}
 	for i, el := range chunks {
-		repoChunks = append(repoChunks, el.ToRepo(chunksLocations[i]))
+		repoChunks = append(repoChunks, el.ToRepo(chunkLocations[i]))
 	}
 
 	// remove local files here

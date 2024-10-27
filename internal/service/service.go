@@ -18,9 +18,10 @@ type FileService interface {
 	Serve(filename string) (*schema.OutFile, error)
 }
 
-// service for creating manifest file and .ts chunks
+// service for creating and removing manifest file and .ts chunks
 type CreatorService interface {
-	Create(vidPath, manPath, chunkPath string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
+	Create(vidPath, manPath, chunkDir string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
+	Remove(vidPath, manPath, chunkDir string) error
 }
 
 // FileService impl
@@ -41,8 +42,21 @@ func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService C
 func (ss *StreamService) Upload(video schema.InVideo) error {
 	// figuring out where to store files locally
 	paths := ss.storage.Paths()
-	manifest, chunks, err := ss.creatorService.Create(paths.VidPath, paths.ManPath, paths.ChunkPath, video)
+
+	// create necessary directories if don't exist
+	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, video.Name)
+
+	preciseVidPath := fmt.Sprintf("%v/%v.mp4", paths.VidPath, video.Name)
+	preciseManPath := fmt.Sprintf("%v/%v.m3u8", paths.ManPath, video.Name)
+	preciseChunkDir := fmt.Sprintf("%v/%v/", paths.ChunkPath, video.Name)
+
+	manifest, chunks, err := ss.creatorService.Create(preciseVidPath, preciseManPath, preciseChunkDir, video)
 	if err != nil {
+		return err
+	}
+
+	// cleaning up
+	if err := ss.creatorService.Remove(preciseVidPath, preciseManPath, preciseChunkDir); err != nil {
 		return err
 	}
 
@@ -70,14 +84,7 @@ func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
 	}
 }
 
-func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
-	// create necessary directories if don't exist
-	ms.createDirs(vidPath, manPath, chunkPath, video.Name)
-
-	preciseVidPath := fmt.Sprintf("%v/%v.mp4", vidPath, video.Name)
-	preciseManPath := fmt.Sprintf("%v/%v.m3u8", manPath, video.Name)
-	preciseChunkDir := fmt.Sprintf("%v/%v/", chunkPath, video.Name)
-
+func (ms *ManifestService) Create(vidPath, manPath, chunkDir string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
 	// reading raw .mp4 video file
 	videoData, err := io.ReadAll(video.File.Raw)
 	if err != nil {
@@ -85,18 +92,18 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video sche
 	}
 
 	// creating .mp4 video file locally
-	if err := os.WriteFile(fmt.Sprintf("%v/%v.mp4", vidPath, video.Name), videoData, 0664); err != nil {
+	if err := os.WriteFile(vidPath, videoData, 0664); err != nil {
 		return nil, nil, err
 	}
 
 	// segmentation + .m3u8 creation
 	// results in manifest file and chunks creation
 	cmd := utils.SegmentVideoAndCreateManifest(
-		preciseVidPath,
+		vidPath,
 		// precise manifest path
-		preciseManPath,
+		manPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", preciseChunkDir, video.Name),
+		fmt.Sprintf("%v/%v_%%4d.ts", chunkDir, video.Name),
 	)
 
 	// check if segmentation went smoothely
@@ -110,7 +117,7 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video sche
 	chunks = &[]schema.InFile{}
 
 	// retrieving manifest data
-	manifestFile, _ := os.Open(preciseManPath)
+	manifestFile, _ := os.Open(manPath)
 	manifestStat, _ := manifestFile.Stat()
 
 	manifest = &schema.InFile{
@@ -120,12 +127,12 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video sche
 	}
 
 	// itrating over each chunk in the local directory
-	chunkFiles, _ := os.ReadDir(preciseChunkDir)
+	chunkFiles, _ := os.ReadDir(chunkDir)
 	// filling up chunk array
 	for _, chunk := range chunkFiles {
 		// retrieving chunk data
 		chunkName := chunk.Name()
-		chunkFile, _ := os.Open(preciseChunkDir + chunkName)
+		chunkFile, _ := os.Open(chunkDir + chunkName)
 		chunkStat, _ := chunkFile.Stat()
 
 		// filling up chunk container
@@ -141,7 +148,23 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video sche
 	return manifest, chunks, nil
 }
 
-func (ss *ManifestService) createDirs(vidPath, manPath, chunkPath, objName string) {
+func (ms *ManifestService) Remove(vidPath, manPath, chunkDir string) error {
+	if err := os.Remove(vidPath); err != nil {
+		return err
+	}
+
+	if err := os.Remove(manPath); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(chunkDir); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createDirs(vidPath, manPath, chunkPath, objName string) {
 	chunkFilePath := fmt.Sprintf("%v/%v", chunkPath, objName)
 	utils.MKDir(chunkPath).Run()
 	utils.MKDir(chunkFilePath).Run()

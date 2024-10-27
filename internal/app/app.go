@@ -45,12 +45,12 @@ func Run() {
 	} else {
 		repo, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Error when initializing db: ", err)
 		}
 
 		s3, err := obj.NewS3(config.Storage.Distr.S3Config)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("Error when initializing s3: ", err)
 		}
 
 		store = storage.NewDistibutedStorage(infoLogger, errLogger, paths, repo, s3)

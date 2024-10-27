@@ -52,16 +52,16 @@ func (r *router) get(c echo.Context, filename string) (err error) {
 
 // POST /api/v1/upload
 func (r *router) uploadFile(c echo.Context) error {
-	filename := c.FormValue("filename")
+	name := c.FormValue("name")
 	multipart, err := c.FormFile("file")
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
 
-	return r.upload(c, filename, multipart)
+	return r.upload(c, name, multipart)
 }
 
-func (r *router) upload(c echo.Context, filename string, multipart *multipart.FileHeader) error {
+func (r *router) upload(c echo.Context, name string, multipart *multipart.FileHeader) error {
 	// check if attached file is of mp4 format
 	if !strings.HasSuffix(multipart.Filename, ".mp4") {
 		return echo.ErrUnprocessableEntity
@@ -72,10 +72,13 @@ func (r *router) upload(c echo.Context, filename string, multipart *multipart.Fi
 		return r.errHandler.handle(err)
 	}
 
-	inVideo := schema.InFile{
-		Raw:  video,
-		Name: filename,
-		Size: int(multipart.Size),
+	inVideo := schema.InVideo{
+		File: schema.InFile{
+			Raw:  video,
+			Name: multipart.Filename,
+			Size: int(multipart.Size),
+		},
+		Name: name,
 	}
 
 	// uploading all the created files

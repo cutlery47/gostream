@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/cutlery47/gostream/internal/schema"
@@ -12,14 +13,14 @@ import (
 
 // service, responsible for all data manipulations
 type FileService interface {
-	Upload(video schema.InFile) error
+	Upload(video schema.InVideo) error
 	Remove(filename string) error
 	Serve(filename string) (*schema.OutFile, error)
 }
 
 // service for creating manifest file and .ts chunks
 type CreatorService interface {
-	Create(vidPath, manPath, chunkPath string, file schema.InFile) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
+	Create(vidPath, manPath, chunkPath string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
 }
 
 // FileService impl
@@ -37,7 +38,7 @@ func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService C
 	}
 }
 
-func (ss *StreamService) Upload(video schema.InFile) error {
+func (ss *StreamService) Upload(video schema.InVideo) error {
 	// figuring out where to store files locally
 	paths := ss.storage.Paths()
 	manifest, chunks, err := ss.creatorService.Create(paths.VidPath, paths.ManPath, paths.ChunkPath, video)
@@ -69,23 +70,23 @@ func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
 	}
 }
 
-func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schema.InFile) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
+func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
 	// create necessary directories if don't exist
-	ms.createDirs(vidPath, manPath, chunkPath, file.Name)
+	ms.createDirs(vidPath, manPath, chunkPath, video.Name)
 
-	preciseVidPath := fmt.Sprintf("%v/%v.mp4", vidPath, file.Name)
-	preciseManPath := fmt.Sprintf("%v/%v.m3u8", manPath, file.Name)
-	preciseChunkDir := fmt.Sprintf("%v/%v/", chunkPath, file.Name)
+	preciseVidPath := fmt.Sprintf("%v/%v.mp4", vidPath, video.Name)
+	preciseManPath := fmt.Sprintf("%v/%v.m3u8", manPath, video.Name)
+	preciseChunkDir := fmt.Sprintf("%v/%v/", chunkPath, video.Name)
 
 	// reading raw .mp4 video file
-	fileData := make([]byte, file.Size)
-	if _, err := file.Raw.Read(fileData); err != nil {
-		ms.errLog.Error(err.Error())
+	videoData, err := io.ReadAll(video.File.Raw)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// creating .mp4 video file locally
-	if err := os.WriteFile(fmt.Sprintf("%v/%v.mp4", vidPath, file.Name), fileData, 0664); err != nil {
-		ms.errLog.Error(err.Error())
+	if err := os.WriteFile(fmt.Sprintf("%v/%v.mp4", vidPath, video.Name), videoData, 0664); err != nil {
+		return nil, nil, err
 	}
 
 	// segmentation + .m3u8 creation
@@ -95,7 +96,7 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schem
 		// precise manifest path
 		preciseManPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", preciseChunkDir, file.Name),
+		fmt.Sprintf("%v/%v_%%4d.ts", preciseChunkDir, video.Name),
 	)
 
 	// check if segmentation went smoothely
@@ -105,7 +106,6 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schem
 		return nil, nil, ErrSegmentationException
 	}
 
-	// creating containers for manifest and chunks
 	manifest = &schema.InFile{}
 	chunks = &[]schema.InFile{}
 
@@ -113,10 +113,11 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schem
 	manifestFile, _ := os.Open(preciseManPath)
 	manifestStat, _ := manifestFile.Stat()
 
-	// filling up manifest container
-	manifest.Raw = manifestFile
-	manifest.Name = manifestStat.Name()
-	manifest.Size = int(manifestStat.Size())
+	manifest = &schema.InFile{
+		Raw:  manifestFile,
+		Name: manifestStat.Name(),
+		Size: int(manifestStat.Size()),
+	}
 
 	// itrating over each chunk in the local directory
 	chunkFiles, _ := os.ReadDir(preciseChunkDir)
@@ -128,10 +129,11 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schem
 		chunkStat, _ := chunkFile.Stat()
 
 		// filling up chunk container
-		chunkEl := schema.InFile{}
-		chunkEl.Name = chunkName
-		chunkEl.Raw = chunkFile
-		chunkEl.Size = int(chunkStat.Size())
+		chunkEl := schema.InFile{
+			Name: chunkName,
+			Raw:  chunkFile,
+			Size: int(chunkStat.Size()),
+		}
 
 		*chunks = append(*chunks, chunkEl)
 	}
@@ -139,8 +141,8 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkPath string, file schem
 	return manifest, chunks, nil
 }
 
-func (ss *ManifestService) createDirs(vidPath, manPath, chunkPath, filename string) {
-	chunkFilePath := fmt.Sprintf("%v/%v", chunkPath, filename)
+func (ss *ManifestService) createDirs(vidPath, manPath, chunkPath, objName string) {
+	chunkFilePath := fmt.Sprintf("%v/%v", chunkPath, objName)
 	utils.MKDir(chunkPath).Run()
 	utils.MKDir(chunkFilePath).Run()
 	utils.MKDir(manPath).Run()

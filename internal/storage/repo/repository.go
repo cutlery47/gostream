@@ -9,9 +9,9 @@ import (
 )
 
 type Repository interface {
-	CreateAll(video, manifest InRepositoryFile, chunks []InRepositoryFile) error
-	Read(filename string) (*RepositoryFile, error)
-	Delete(filename string) (*RepositoryFile, error)
+	CreateAll(video InVideo, manifest InFile, chunks []InFile) error
+	Read(filename string) (*File, error)
+	Delete(filename string) (*File, error)
 }
 
 type FileRepository struct {
@@ -29,14 +29,14 @@ func NewFileRepository(conf config.DBConfig) (*FileRepository, error) {
 	return &FileRepository{db: db}, nil
 }
 
-func (fr *FileRepository) CreateAll(video, manifest InRepositoryFile, chunks []InRepositoryFile) error {
+func (fr *FileRepository) CreateAll(video InVideo, manifest InFile, chunks []InFile) error {
 	return fmt.Errorf("123123")
 }
 
-func (fr *FileRepository) Read(filename string) (*RepositoryFile, error) {
+func (fr *FileRepository) Read(filename string) (*File, error) {
 	return nil, fmt.Errorf("xyu3")
 }
 
-func (fr *FileRepository) Delete(filename string) (*RepositoryFile, error) {
+func (fr *FileRepository) Delete(filename string) (*File, error) {
 	return nil, fmt.Errorf("xyu2")
 }

@@ -16,5 +16,3 @@ RUN chmod 777 /logs
 COPY migrations/init/  /docker-entrypoint-initdb.d/
  
 USER 999:$GID
-
-CMD ["postgres"]

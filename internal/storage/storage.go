@@ -15,7 +15,7 @@ import (
 // abstracts out file manipulation
 type Storage interface {
 	// stores files
-	Store(video, manifest schema.InFile, chunks []schema.InFile) error
+	Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error
 	// retrieves file
 	Get(filename string) (*schema.OutFile, error)
 	// removes file
@@ -46,34 +46,36 @@ func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo repo.Re
 	}
 }
 
-// todo: make s3 uploads "transaactional"
-func (ds *DistibutedStorage) Store(video, manifest schema.InFile, chunks []schema.InFile) error {
-	vidS3 := obj.S3File{Raw: video.Raw}
-	vidBucketName, vidETag, err := ds.s3.Store(vidS3)
+// todo: make s3 uploads "transactional"
+func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error {
+	fmt.Printf("vid: %+v\nman: %+v\nchunks: %+v\n", video, manifest, chunks)
+
+	vidS3 := obj.FromSchema(video.File)
+	vidLocation, err := ds.s3.Store(vidS3)
 	if err != nil {
 		return err
 	}
 
-	manS3 := obj.S3File{Raw: video.Raw}
-	manBucketName, manETag, err := ds.s3.Store(manS3)
+	manS3 := obj.FromSchema(manifest)
+	manLocation, err := ds.s3.Store(manS3)
 	if err != nil {
 		return err
 	}
 
-	chunksS3 := []obj.S3File{}
-	for _, el := range chunks {
-		chunksS3 = append(chunksS3, obj.S3File{Raw: el.Raw})
+	chunksS3 := []obj.InFile{}
+	for _, chunk := range chunks {
+		chunksS3 = append(chunksS3, obj.FromSchema(chunk))
 	}
-	chunksBucketNames, chunksETags, err := ds.s3.StoreMultiple(chunksS3...)
+	chunksLocations, err := ds.s3.StoreMultiple(chunksS3...)
 	if err != nil {
 		return err
 	}
 
-	repoVid := video.ToRepo(vidBucketName, vidETag)
-	repoMan := manifest.ToRepo(manBucketName, manETag)
-	repoChunks := []repo.InRepositoryFile{}
+	repoVid := video.ToRepo(vidLocation)
+	repoMan := manifest.ToRepo(manLocation)
+	repoChunks := []repo.InFile{}
 	for i, el := range chunks {
-		repoChunks = append(repoChunks, el.ToRepo(chunksBucketNames[i], chunksETags[i]))
+		repoChunks = append(repoChunks, el.ToRepo(chunksLocations[i]))
 	}
 
 	// remove local files here
@@ -87,7 +89,7 @@ func (ds *DistibutedStorage) Get(filename string) (*schema.OutFile, error) {
 		return nil, err
 	}
 
-	s3File, err := ds.s3.Get(repoFile.Name)
+	s3File, err := ds.s3.Get(repoFile.Data.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func (ds *DistibutedStorage) Remove(filename string) error {
 		return err
 	}
 
-	if _, err := ds.s3.Delete(repoFile.Name); err != nil {
+	if _, err := ds.s3.Delete(repoFile.Data.Name); err != nil {
 		return err
 	}
 
@@ -114,7 +116,7 @@ func (ds *DistibutedStorage) Exists(filename string) bool {
 		return false
 	}
 
-	if _, err := ds.s3.Get(repoFile.Name); err != nil {
+	if _, err := ds.s3.Get(repoFile.Data.Name); err != nil {
 		return false
 	}
 
@@ -138,7 +140,7 @@ func NewLocalStorage(errLog *zap.Logger, paths Paths) *LocalStorage {
 	}
 }
 
-func (ls *LocalStorage) Store(video, manifest schema.InFile, chunks []schema.InFile) error {
+func (ls *LocalStorage) Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error {
 	// when storing files locally, there is no need to write file to any other storage
 	return nil
 }

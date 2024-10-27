@@ -2,15 +2,20 @@ package repo
 
 import "time"
 
-type InRepositoryFile struct {
+type InFile struct {
 	Name       string
 	Size       int
 	UploadedAt time.Time
-	BucketName string
-	ETag       string
+	// location of the file in s3
+	Location string
 }
 
-type RepositoryFile struct {
-	id int
-	InRepositoryFile
+type InVideo struct {
+	File      InFile
+	VideoName string
+}
+
+type File struct {
+	Id   int
+	Data InFile
 }

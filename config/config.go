@@ -43,6 +43,14 @@ type DBConfig struct {
 }
 
 type S3Config struct {
+	Host        string
+	Port        string
+	AdmPort     string
+	VidBucket   string
+	ManBucket   string
+	ChunkBucket string
+	User        string
+	Password    string
 }
 
 type segmentConfig struct {
@@ -62,7 +70,14 @@ func New() (*Config, error) {
 		VideoPath:    os.Getenv("VIDEO_PATH"),
 	}
 
-	s3Config := S3Config{}
+	s3Config := S3Config{
+		Host:        os.Getenv("MINIO_HOST"),
+		Port:        os.Getenv("MINIO_PORT"),
+		AdmPort:     os.Getenv("MINIO_ADMIN_PORT"),
+		VidBucket:   os.Getenv("MINIO_VID_BUCKET"),
+		ChunkBucket: os.Getenv("MINIO_CHUNK_BUCKET"),
+		ManBucket:   os.Getenv("MINIO_MAN_BUCKET"),
+	}
 
 	dbConfig := DBConfig{
 		User:     os.Getenv("DB_USER"),

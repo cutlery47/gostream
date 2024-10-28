@@ -79,8 +79,6 @@ func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile,
 		repoChunks = append(repoChunks, el.ToRepo(chunkLocations[i]))
 	}
 
-	// remove local files here
-
 	return ds.repo.CreateAll(repoVid, repoMan, repoChunks)
 }
 

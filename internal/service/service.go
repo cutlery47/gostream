@@ -50,17 +50,20 @@ func (ss *StreamService) Upload(video schema.InVideo) error {
 	preciseManPath := fmt.Sprintf("%v/%v.m3u8", paths.ManPath, video.Name)
 	preciseChunkDir := fmt.Sprintf("%v/%v/", paths.ChunkPath, video.Name)
 
+	// creating all the files locally
 	manifest, chunks, err := ss.creatorService.Create(preciseVidPath, preciseManPath, preciseChunkDir, video)
 	if err != nil {
 		return err
 	}
 
-	// cleaning up
-	if err := ss.creatorService.Remove(preciseVidPath, preciseManPath, preciseChunkDir); err != nil {
+	defer ss.creatorService.Remove(preciseVidPath, preciseManPath, preciseChunkDir)
+
+	// storing
+	if err := ss.storage.Store(video, *manifest, *chunks); err != nil {
 		return err
 	}
 
-	return ss.storage.Store(video, *manifest, *chunks)
+	return nil
 }
 
 func (ss *StreamService) Remove(filename string) error {

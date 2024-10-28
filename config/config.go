@@ -40,6 +40,7 @@ type DBConfig struct {
 	Host     string
 	Port     string
 	DBName   string
+	SSLMode  string
 }
 
 type S3Config struct {
@@ -80,11 +81,12 @@ func New() (*Config, error) {
 	}
 
 	dbConfig := DBConfig{
-		User:     os.Getenv("DB_USER"),
-		Password: os.Getenv("DB_PASSWORD"),
-		Host:     os.Getenv("DB_HOST"),
-		Port:     os.Getenv("DB_PORT"),
-		DBName:   os.Getenv("DB_NAME"),
+		User:     os.Getenv("POSTGRES_USER"),
+		Password: os.Getenv("POSTGRES_PASSWORD"),
+		Host:     os.Getenv("POSTGRES_HOST"),
+		Port:     os.Getenv("POSTGRES_PORT"),
+		DBName:   os.Getenv("POSTGRES_NAME"),
+		SSLMode:  os.Getenv("POSTGRES_SSL"),
 	}
 
 	dsConfig := distrStorageConfig{

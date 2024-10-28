@@ -1,7 +1,8 @@
+\connect gostream
+
 CREATE TABLE file_schema.files (
-    id          file_schema.uuid_key,
-    filename    file_schema.string,
-    PRIMARY KEY (id)
+    id          UUID                    PRIMARY KEY,
+    filename    file_schema.string
 );
 
 CREATE TABLE file_schema.files_meta (

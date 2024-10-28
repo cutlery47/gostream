@@ -2,7 +2,6 @@ package schema
 
 import (
 	"io"
-	"time"
 
 	"github.com/cutlery47/gostream/internal/storage/repo"
 )
@@ -24,10 +23,9 @@ type InVideo struct {
 
 func (f InFile) ToRepo(location string) repo.InFile {
 	return repo.InFile{
-		Name:       f.Name,
-		Size:       f.Size,
-		UploadedAt: time.Now(),
-		Location:   location,
+		Name:     f.Name,
+		Size:     f.Size,
+		Location: location,
 	}
 }
 

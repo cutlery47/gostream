@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cutlery47/gostream/config"
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 type Repository interface {
@@ -41,6 +42,10 @@ func (fr *FileRepository) CreateAll(video InVideo, manifest InFile, chunks []InF
 	defer tx.Rollback()
 
 	if err := fr.createVideo(tx, video); err != nil {
+		// check if video name is unique
+		if pgerr, ok := err.(*pq.Error); ok && pgerr.Code == "23505" {
+			return ErrUniqueVideo
+		}
 		return err
 	}
 
@@ -66,54 +71,11 @@ func (fr *FileRepository) Delete(filename string) (*File, error) {
 func (fr *FileRepository) createVideo(tx *sql.Tx, video InVideo) error {
 	id := uuid.New()
 
-	preparedInsertVideoFile :=
-		`
-		INSERT INTO file_schema.files
-		(id, filename)
-		VALUES
-		($1, $2);
-		`
-
-	insertVideoFile, err := tx.Prepare(preparedInsertVideoFile)
-	if err != nil {
+	if err := fr.insertFile(tx, id, video.VideoName, video.File.Size); err != nil {
 		return err
 	}
 
-	preparedInsertVideoMeta :=
-		`
-		INSERT INTO file_schema.files_meta
-		(size, file_id)
-		VALUES
-		($1, $2);
-		`
-
-	insertVideoMeta, err := tx.Prepare(preparedInsertVideoMeta)
-	if err != nil {
-		return err
-	}
-
-	preparedInsertVideo :=
-		`
-		INSERT INTO file_schema.files_vid
-		(location, file_id)
-		VALUES
-		($1, $2);
-		`
-
-	insertVideo, err := tx.Prepare(preparedInsertVideo)
-	if err != nil {
-		return err
-	}
-
-	if _, err := insertVideoFile.Exec(id, video.VideoName); err != nil {
-		return err
-	}
-
-	if _, err := insertVideoMeta.Exec(video.File.Size, id); err != nil {
-		return err
-	}
-
-	if _, err := insertVideo.Exec(video.File.Location, id); err != nil {
+	if err := fr.insertLocation(tx, id, video.VideoName, video.File.Location); err != nil {
 		return err
 	}
 
@@ -121,9 +83,90 @@ func (fr *FileRepository) createVideo(tx *sql.Tx, video InVideo) error {
 }
 
 func (fr *FileRepository) createManifest(tx *sql.Tx, manifest InFile) error {
+	id := uuid.New()
+
+	if err := fr.insertFile(tx, id, manifest.Name, manifest.Size); err != nil {
+		return err
+	}
+
+	if err := fr.insertLocation(tx, id, manifest.Name, manifest.Location); err != nil {
+		return err
+	}
+
 	return nil
+
 }
 
 func (fr *FileRepository) createChunks(tx *sql.Tx, chunks []InFile) error {
+	for _, chunk := range chunks {
+		id := uuid.New()
+
+		if err := fr.insertFile(tx, id, chunk.Name, chunk.Size); err != nil {
+			return err
+		}
+
+		if err := fr.insertLocation(tx, id, chunk.Name, chunk.Location); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (fr *FileRepository) insertFile(tx *sql.Tx, id uuid.UUID, filename string, size int) error {
+	insertFile :=
+		`
+		INSERT INTO file_schema.files
+		(id, filename)
+		VALUES
+		($1, $2);
+		`
+
+	insertMeta :=
+		`
+		INSERT INTO file_schema.files_meta
+		(size, file_id)
+		VALUES
+		($1, $2);
+		`
+
+	if _, err := tx.Exec(insertFile, id, filename); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(insertMeta, size, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (fr *FileRepository) insertLocation(tx *sql.Tx, id uuid.UUID, filename string, location string) error {
+	insert := fmt.Sprintf(
+		`
+		INSERT INTO file_schema.%v
+		(location, file_id)
+		VALUES
+		($1, $2);
+		`,
+		fr.determineTable(filename),
+	)
+
+	if _, err := tx.Exec(insert, location, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (fr *FileRepository) determineTable(filename string) string {
+	if strings.HasSuffix(filename, ".m3u8") {
+		return "files_manifest"
+	}
+
+	if strings.HasSuffix(filename, ".ts") {
+		return "files_ts"
+	}
+
+	return "files_vid"
 }

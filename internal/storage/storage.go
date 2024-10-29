@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -79,7 +80,14 @@ func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile,
 		repoChunks = append(repoChunks, el.ToRepo(chunkLocations[i]))
 	}
 
-	return ds.repo.CreateAll(repoVid, repoMan, repoChunks)
+	if err := ds.repo.CreateAll(repoVid, repoMan, repoChunks); err != nil {
+		if errors.Is(err, repo.ErrUniqueVideo) {
+			return ErrUniueVideo
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (ds *DistibutedStorage) Get(filename string) (*schema.OutFile, error) {

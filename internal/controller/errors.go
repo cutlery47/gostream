@@ -23,6 +23,7 @@ func newErrHandler(errLog *zap.Logger) *errHandler {
 		service.ErrSegmentationException: echo.ErrInternalServerError,
 		service.ErrNotImplemented:        echo.ErrNotImplemented,
 		storage.ErrNotImplemented:        echo.ErrNotImplemented,
+		storage.ErrUniueVideo:            echo.ErrBadRequest,
 	}
 
 	return &errHandler{
@@ -32,14 +33,14 @@ func newErrHandler(errLog *zap.Logger) *errHandler {
 }
 
 func (eh errHandler) handle(err error) *echo.HTTPError {
-	eh.log.Error(fmt.Sprintf("Error: %v", err))
-
 	// trying to map err to HTTPError
-	if err, ok := err.(*service.ServiceError); ok {
-		if httpErr, ok := eh.errMap[err]; ok {
-			return httpErr
-		}
+	if httpErr, ok := eh.errMap[err]; ok {
+		httpErr.Message = err.Error()
+		return httpErr
 	}
+
+	// log error if unexpected
+	eh.log.Error(fmt.Sprintf("Error: %v", err))
 
 	// return 500 if:
 	// 1) err couldn't be mapped to HTTPError

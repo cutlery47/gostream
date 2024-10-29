@@ -2,7 +2,8 @@
 
 CREATE TABLE file_schema.files (
     id          UUID                    PRIMARY KEY,
-    filename    file_schema.string
+    filename    file_schema.string,
+    CONSTRAINT  unique_filename UNIQUE (filename)
 );
 
 CREATE TABLE file_schema.files_meta (

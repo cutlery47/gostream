@@ -1,12 +1,11 @@
 package controller
 
 import (
+	"io"
 	"mime/multipart"
 	"strings"
 
-	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/service"
-	"github.com/cutlery47/gostream/internal/utils"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
@@ -32,22 +31,24 @@ func (r *router) getFile(c echo.Context) error {
 }
 
 func (r *router) get(c echo.Context, filename string) (err error) {
-	var file *schema.OutFile
+	var file io.ReadCloser
+
+	ctx := c.Request().Context()
 
 	// searching for requested file
-	file, err = r.service.Serve(filename)
+	file, err = r.service.Serve(ctx, filename)
 	if err != nil {
 		return r.errHandler.handle(err)
 	}
 
 	// converting the file into a sequence of bytes
-	blob, err := utils.BufferReader(file.Raw)
+	blob, err := io.ReadAll(file)
 	if err != nil {
-		return r.errHandler.handle(err)
+		return err
 	}
 
 	// returning the file
-	return c.Blob(200, "application/mpeg", blob.Bytes())
+	return c.Blob(200, "application/mpeg", blob)
 }
 
 // POST /api/v1/upload
@@ -62,6 +63,8 @@ func (r *router) uploadFile(c echo.Context) error {
 }
 
 func (r *router) upload(c echo.Context, name string, multipart *multipart.FileHeader) error {
+	ctx := c.Request().Context()
+
 	// check if attached file is of mp4 format
 	if !strings.HasSuffix(multipart.Filename, ".mp4") {
 		return echo.ErrUnprocessableEntity
@@ -72,17 +75,8 @@ func (r *router) upload(c echo.Context, name string, multipart *multipart.FileHe
 		return r.errHandler.handle(err)
 	}
 
-	inVideo := schema.InVideo{
-		File: schema.InFile{
-			Raw:  video,
-			Name: multipart.Filename,
-			Size: int(multipart.Size),
-		},
-		Name: name,
-	}
-
 	// uploading all the created files
-	if err := r.service.Upload(inVideo); err != nil {
+	if err := r.service.Upload(ctx, video, name); err != nil {
 		return r.errHandler.handle(err)
 	}
 
@@ -97,7 +91,9 @@ func (r *router) deleteFile(c echo.Context) error {
 }
 
 func (r *router) delete(c echo.Context, filename string) error {
-	if err := r.service.Remove(filename); err != nil {
+	ctx := c.Request().Context()
+
+	if err := r.service.Remove(ctx, filename); err != nil {
 		return r.errHandler.handle(err)
 	}
 

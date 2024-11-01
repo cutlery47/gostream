@@ -1,11 +1,11 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/cutlery47/gostream/internal/schema"
 	"github.com/cutlery47/gostream/internal/storage"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
@@ -13,15 +13,15 @@ import (
 
 // service, responsible for all data manipulations
 type FileService interface {
-	Upload(video schema.InVideo) error
-	Remove(filename string) error
-	Serve(filename string) (*schema.OutFile, error)
+	Upload(ctx context.Context, video io.ReadCloser, name string) error
+	Remove(ctx context.Context, filename string) error
+	Serve(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
 // service for creating and removing manifest file and .ts chunks
 type CreatorService interface {
-	Create(vidPath, manPath, chunkDir string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error)
-	Remove(vidPath, manPath, chunkDir string) error
+	Create(paths storage.Paths, video io.ReadCloser, name string) (manifest io.ReadCloser, chunks []io.ReadCloser, err error)
+	Remove(paths storage.Paths) error
 }
 
 // FileService impl
@@ -39,39 +39,55 @@ func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService C
 	}
 }
 
-func (ss *StreamService) Upload(video schema.InVideo) error {
+func (ss *StreamService) Upload(ctx context.Context, video *os.File, name string) error {
 	// figuring out where to store files locally
 	paths := ss.storage.Paths()
-
 	// create necessary directories if don't exist
-	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, video.Name)
+	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, name)
 
-	preciseVidPath := fmt.Sprintf("%v/%v.mp4", paths.VidPath, video.Name)
-	preciseManPath := fmt.Sprintf("%v/%v.m3u8", paths.ManPath, video.Name)
-	preciseChunkDir := fmt.Sprintf("%v/%v/", paths.ChunkPath, video.Name)
+	precisePaths := storage.Paths{
+		VidPath:   fmt.Sprintf("%v/%v.mp4", paths.VidPath, name),
+		ManPath:   fmt.Sprintf("%v/%v.m3u8", paths.ManPath, name),
+		ChunkPath: fmt.Sprintf("%v/%v/", paths.ChunkPath, name),
+	}
 
 	// creating all the files locally
-	manifest, chunks, err := ss.creatorService.Create(preciseVidPath, preciseManPath, preciseChunkDir, video)
+	manifest, chunks, err := ss.creatorService.Create(precisePaths, video, name)
 	if err != nil {
 		return err
 	}
 
-	defer ss.creatorService.Remove(preciseVidPath, preciseManPath, preciseChunkDir)
+	defer ss.creatorService.Remove(precisePaths)
 
-	// storing
-	if err := ss.storage.Store(video, *manifest, *chunks); err != nil {
+	sVideo, err := storage.FromFD(video, name)
+	if err != nil {
 		return err
 	}
 
-	return nil
+	sManifest, err := storage.FromFD(manifest, manifest.Name())
+	if err != nil {
+		return err
+	}
+
+	var sChunks []storage.File
+	for _, chunk := range chunks {
+		sChunk, err := storage.FromFD(chunk, chunk.Name())
+		if err != nil {
+			return err
+		}
+
+		sChunks = append(sChunks, *sChunk)
+	}
+
+	return ss.storage.Store(ctx, *sVideo, *sManifest, sChunks)
 }
 
-func (ss *StreamService) Remove(filename string) error {
-	return ss.storage.Remove(filename)
+func (ss *StreamService) Remove(ctx context.Context, filename string) error {
+	return ss.storage.Remove(ctx, filename)
 }
 
-func (ss *StreamService) Serve(filename string) (*schema.OutFile, error) {
-	return ss.storage.Get(filename)
+func (ss *StreamService) Serve(ctx context.Context, filename string) (io.ReadCloser, error) {
+	return ss.storage.Get(ctx, filename)
 }
 
 // CreateService impl
@@ -87,26 +103,26 @@ func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
 	}
 }
 
-func (ms *ManifestService) Create(vidPath, manPath, chunkDir string, video schema.InVideo) (manifest *schema.InFile, chunks *[]schema.InFile, err error) {
+func (ms *ManifestService) Create(paths storage.Paths, video *os.File, name string) (*os.File, []*os.File, error) {
 	// reading raw .mp4 video file
-	videoData, err := io.ReadAll(video.File.Raw)
+	videoData, err := io.ReadAll(video)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// creating .mp4 video file locally
-	if err := os.WriteFile(vidPath, videoData, 0664); err != nil {
+	if err := os.WriteFile(paths.VidPath, videoData, 0664); err != nil {
 		return nil, nil, err
 	}
 
 	// segmentation + .m3u8 creation
 	// results in manifest file and chunks creation
 	cmd := utils.SegmentVideoAndCreateManifest(
-		vidPath,
+		paths.VidPath,
 		// precise manifest path
-		manPath,
+		paths.ManPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", chunkDir, video.Name),
+		fmt.Sprintf("%v/%v_%%4d.ts", paths.ChunkPath, name),
 	)
 
 	// check if segmentation went smoothely
@@ -116,51 +132,41 @@ func (ms *ManifestService) Create(vidPath, manPath, chunkDir string, video schem
 		return nil, nil, ErrSegmentationException
 	}
 
-	manifest = &schema.InFile{}
-	chunks = &[]schema.InFile{}
+	var manifest *os.File
+	var chunks []*os.File
 
 	// retrieving manifest data
-	manifestFile, _ := os.Open(manPath)
-	manifestStat, _ := manifestFile.Stat()
-
-	manifest = &schema.InFile{
-		Raw:  manifestFile,
-		Name: manifestStat.Name(),
-		Size: int(manifestStat.Size()),
+	manifest, err = os.Open(paths.ManPath)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// itrating over each chunk in the local directory
-	chunkFiles, _ := os.ReadDir(chunkDir)
+	chunkDir, _ := os.ReadDir(paths.ChunkPath)
 	// filling up chunk array
-	for _, chunk := range chunkFiles {
+	for _, el := range chunkDir {
 		// retrieving chunk data
-		chunkName := chunk.Name()
-		chunkFile, _ := os.Open(chunkDir + chunkName)
-		chunkStat, _ := chunkFile.Stat()
-
-		// filling up chunk container
-		chunkEl := schema.InFile{
-			Name: chunkName,
-			Raw:  chunkFile,
-			Size: int(chunkStat.Size()),
+		chunk, err := os.Open(paths.ChunkPath + el.Name())
+		if err != nil {
+			return nil, nil, err
 		}
 
-		*chunks = append(*chunks, chunkEl)
+		chunks = append(chunks, chunk)
 	}
 
 	return manifest, chunks, nil
 }
 
-func (ms *ManifestService) Remove(vidPath, manPath, chunkDir string) error {
-	if err := os.Remove(vidPath); err != nil {
+func (ms *ManifestService) Remove(paths storage.Paths) error {
+	if err := os.Remove(paths.VidPath); err != nil {
 		return err
 	}
 
-	if err := os.Remove(manPath); err != nil {
+	if err := os.Remove(paths.ManPath); err != nil {
 		return err
 	}
 
-	if err := os.RemoveAll(chunkDir); err != nil {
+	if err := os.RemoveAll(paths.ChunkPath); err != nil {
 		return err
 	}
 

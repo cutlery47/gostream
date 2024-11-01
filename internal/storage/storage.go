@@ -1,14 +1,12 @@
 package storage
 
 import (
-	"errors"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
-	"github.com/cutlery47/gostream/internal/schema"
-	"github.com/cutlery47/gostream/internal/storage/obj"
-	"github.com/cutlery47/gostream/internal/storage/repo"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
@@ -16,28 +14,26 @@ import (
 // abstracts out file manipulation
 type Storage interface {
 	// stores files
-	Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error
+	Store(ctx context.Context, video, manifest File, chunks []File) error
 	// retrieves file
-	Get(filename string) (*schema.OutFile, error)
+	Get(ctx context.Context, filename string) (io.ReadCloser, error)
 	// removes file
-	Remove(filename string) error
-	// checks if file exists
-	Exists(filename string) bool
+	Remove(ctx context.Context, filename string) error
 	// returns local paths
 	Paths() Paths
 }
 
 // db + obj storage based storage
 type DistibutedStorage struct {
-	repo repo.Repository
-	s3   obj.ObjectStorage
+	repo Repository
+	s3   ObjectStorage
 
 	infoLog *zap.Logger
 	errLog  *zap.Logger
 	paths   Paths
 }
 
-func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo repo.Repository, s3 obj.ObjectStorage) *DistibutedStorage {
+func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo Repository, s3 ObjectStorage) *DistibutedStorage {
 	return &DistibutedStorage{
 		repo:    repo,
 		s3:      s3,
@@ -48,86 +44,47 @@ func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo repo.Re
 }
 
 // todo: make s3 uploads "transactional"
-func (ds *DistibutedStorage) Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error {
-	// storing initial video in s3
-	vidS3 := obj.FromSchema(video.File)
-	vidLocation, err := ds.s3.Store(vidS3)
+func (ds *DistibutedStorage) Store(ctx context.Context, video, manifest File, chunks []File) error {
+	vidLocation, err := ds.s3.Store(ctx, video)
 	if err != nil {
 		return err
 	}
 
-	// storing manifest in s3
-	manS3 := obj.FromSchema(manifest)
-	manLocation, err := ds.s3.Store(manS3)
+	manLocation, err := ds.s3.Store(ctx, manifest)
 	if err != nil {
 		return err
 	}
 
-	// storing manifests in s3
-	chunksS3 := []obj.InFile{}
-	for _, chunk := range chunks {
-		chunksS3 = append(chunksS3, obj.FromSchema(chunk))
-	}
-	chunkLocations, err := ds.s3.StoreMultiple(chunksS3...)
+	chunkLocations, err := ds.s3.StoreMultiple(ctx, chunks...)
 	if err != nil {
 		return err
 	}
 
-	repoVid := video.ToRepo(vidLocation)
-	repoMan := manifest.ToRepo(manLocation)
-	repoChunks := []repo.InFile{}
-	for i, el := range chunks {
-		repoChunks = append(repoChunks, el.ToRepo(chunkLocations[i]))
+	video.Location = vidLocation
+	manifest.Location = manLocation
+	for i := range chunks {
+		chunks[i].Location = chunkLocations[i]
 	}
 
-	if err := ds.repo.CreateAll(repoVid, repoMan, repoChunks); err != nil {
-		if errors.Is(err, repo.ErrUniqueVideo) {
-			return ErrUniueVideo
-		}
-		return err
-	}
-
-	return nil
+	return ds.repo.CreateAll(ctx, video, manifest, chunks)
 }
 
-func (ds *DistibutedStorage) Get(filename string) (*schema.OutFile, error) {
-	repoFile, err := ds.repo.Read(filename)
+func (ds *DistibutedStorage) Get(ctx context.Context, filename string) (io.ReadCloser, error) {
+	fileLocation, err := ds.repo.Read(ctx, filename)
 	if err != nil {
 		return nil, err
 	}
 
-	s3File, err := ds.s3.Get(repoFile.Data.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	return &schema.OutFile{Raw: s3File.Raw}, nil
+	return ds.s3.Get(ctx, fileLocation)
 }
 
-func (ds *DistibutedStorage) Remove(filename string) error {
-	repoFile, err := ds.repo.Delete(filename)
+func (ds *DistibutedStorage) Remove(ctx context.Context, filename string) error {
+	fileLocation, err := ds.repo.Delete(ctx, filename)
 	if err != nil {
 		return err
 	}
 
-	if _, err := ds.s3.Delete(repoFile.Data.Name); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (ds *DistibutedStorage) Exists(filename string) bool {
-	repoFile, err := ds.repo.Read(filename)
-	if err != nil {
-		return false
-	}
-
-	if _, err := ds.s3.Get(repoFile.Data.Name); err != nil {
-		return false
-	}
-
-	return true
+	return ds.s3.Delete(ctx, fileLocation)
 }
 
 func (ds DistibutedStorage) Paths() Paths {
@@ -147,46 +104,27 @@ func NewLocalStorage(errLog *zap.Logger, paths Paths) *LocalStorage {
 	}
 }
 
-func (ls *LocalStorage) Store(video schema.InVideo, manifest schema.InFile, chunks []schema.InFile) error {
+func (ls *LocalStorage) Store(ctx context.Context, video, manifest File, chunks []File) error {
 	// when storing files locally, there is no need to write file to any other storage
 	return nil
 }
 
-func (ls *LocalStorage) Get(filename string) (*schema.OutFile, error) {
+func (ls *LocalStorage) Get(ctx context.Context, filename string) (io.ReadCloser, error) {
 	filePath, err := ls.determinePath(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	fd, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return &schema.OutFile{Raw: fd}, nil
+	return os.Open(filePath)
 }
 
-func (ls *LocalStorage) Remove(filename string) error {
+func (ls *LocalStorage) Remove(ctx context.Context, filename string) error {
 	filePath, err := ls.determinePath(filename)
 	if err != nil {
 		return err
 	}
 
 	return os.Remove(filePath)
-}
-
-func (ls *LocalStorage) Exists(filename string) bool {
-	filePath, err := ls.determinePath(filename)
-	if err != nil {
-		ls.errLog.Error(err.Error())
-		return false
-	}
-
-	if _, err := os.Stat(filePath); err == nil {
-		return true
-	}
-
-	return false
 }
 
 func (ls *LocalStorage) Paths() Paths {

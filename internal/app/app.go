@@ -7,8 +7,6 @@ import (
 	"github.com/cutlery47/gostream/internal/controller"
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/cutlery47/gostream/internal/storage"
-	"github.com/cutlery47/gostream/internal/storage/obj"
-	"github.com/cutlery47/gostream/internal/storage/repo"
 	"github.com/cutlery47/gostream/pkg/logger"
 	"github.com/cutlery47/gostream/pkg/server"
 )
@@ -43,12 +41,12 @@ func Run() {
 	if config.Storage.StorageType == "local" {
 		store = storage.NewLocalStorage(errLogger, paths)
 	} else {
-		repo, err := repo.NewFileRepository(config.Storage.Distr.DBConfig)
+		repo, err := storage.NewFileRepository(config.Storage.Distr.DBConfig)
 		if err != nil {
 			log.Fatal("Error when initializing db: ", err)
 		}
 
-		s3, err := obj.NewS3(config.Storage.Distr.S3Config)
+		s3, err := storage.NewS3(config.Storage.Distr.S3Config)
 		if err != nil {
 			log.Fatal("Error when initializing s3: ", err)
 		}

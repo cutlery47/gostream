@@ -13,14 +13,15 @@ import (
 
 // service, responsible for all data manipulations
 type FileService interface {
-	Upload(ctx context.Context, video io.ReadCloser, name string) error
+	Upload(ctx context.Context, videoReader io.ReadCloser, videoName string) error
 	Remove(ctx context.Context, filename string) error
 	Serve(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
-// service for creating and removing manifest file and .ts chunks
+// service for creating and removing manifest file and .ts chunkss
 type CreatorService interface {
-	Create(paths storage.Paths, video io.ReadCloser, name string) (manifest io.ReadCloser, chunks []io.ReadCloser, err error)
+	Create(paths storage.Paths, video *os.File, videoName string) (*os.File, []*os.File, error)
+	CreateVideo(paths storage.Paths, videoReader io.ReadCloser, videoName string) (*os.File, error)
 	Remove(paths storage.Paths) error
 }
 
@@ -39,27 +40,32 @@ func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService C
 	}
 }
 
-func (ss *StreamService) Upload(ctx context.Context, video *os.File, name string) error {
+func (ss *StreamService) Upload(ctx context.Context, videoReader io.ReadCloser, videoName string) error {
 	// figuring out where to store files locally
 	paths := ss.storage.Paths()
 	// create necessary directories if don't exist
-	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, name)
+	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, videoName)
 
 	precisePaths := storage.Paths{
-		VidPath:   fmt.Sprintf("%v/%v.mp4", paths.VidPath, name),
-		ManPath:   fmt.Sprintf("%v/%v.m3u8", paths.ManPath, name),
-		ChunkPath: fmt.Sprintf("%v/%v/", paths.ChunkPath, name),
+		VidPath:   fmt.Sprintf("%v/%v.mp4", paths.VidPath, videoName),
+		ManPath:   fmt.Sprintf("%v/%v.m3u8", paths.ManPath, videoName),
+		ChunkPath: fmt.Sprintf("%v/%v/", paths.ChunkPath, videoName),
+	}
+
+	video, err := ss.creatorService.CreateVideo(precisePaths, videoReader, videoName)
+	if err != nil {
+		return err
 	}
 
 	// creating all the files locally
-	manifest, chunks, err := ss.creatorService.Create(precisePaths, video, name)
+	manifest, chunks, err := ss.creatorService.Create(precisePaths, video, videoName)
 	if err != nil {
 		return err
 	}
 
 	defer ss.creatorService.Remove(precisePaths)
 
-	sVideo, err := storage.FromFD(video, name)
+	sVideo, err := storage.FromFD(video, videoName)
 	if err != nil {
 		return err
 	}
@@ -103,18 +109,26 @@ func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
 	}
 }
 
-func (ms *ManifestService) Create(paths storage.Paths, video *os.File, name string) (*os.File, []*os.File, error) {
+func (ms *ManifestService) CreateVideo(paths storage.Paths, videoReader io.ReadCloser, videoName string) (*os.File, error) {
 	// reading raw .mp4 video file
-	videoData, err := io.ReadAll(video)
+	videoData, err := io.ReadAll(videoReader)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// creating .mp4 video file locally
-	if err := os.WriteFile(paths.VidPath, videoData, 0664); err != nil {
-		return nil, nil, err
+	video, err := os.OpenFile(paths.VidPath, os.O_CREATE, 0664)
+	if err != nil {
+		return nil, err
 	}
 
+	if _, err := video.Write(videoData); err != nil {
+		return nil, err
+	}
+
+	return video, nil
+}
+
+func (ms *ManifestService) Create(paths storage.Paths, video *os.File, videoName string) (*os.File, []*os.File, error) {
 	// segmentation + .m3u8 creation
 	// results in manifest file and chunks creation
 	cmd := utils.SegmentVideoAndCreateManifest(
@@ -122,7 +136,7 @@ func (ms *ManifestService) Create(paths storage.Paths, video *os.File, name stri
 		// precise manifest path
 		paths.ManPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", paths.ChunkPath, name),
+		fmt.Sprintf("%v/%v_%%4d.ts", paths.ChunkPath, videoName),
 	)
 
 	// check if segmentation went smoothely

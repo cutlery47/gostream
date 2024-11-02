@@ -122,16 +122,16 @@ func (fr *FileRepository) insertFile(ctx context.Context, tx *sql.Tx, file File)
 	insertMeta :=
 		`
 		INSERT INTO file_schema.files_meta
-		(file_id, size)
+		(file_id)
 		VALUES
-		($1, $2);
+		($1);
 		`
 
 	if _, err := tx.ExecContext(ctx, insertFile, id, file.FileName, file.Location.Bucket, file.Location.Object); err != nil {
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, insertMeta, id, file.Size); err != nil {
+	if _, err := tx.ExecContext(ctx, insertMeta, id); err != nil {
 		return err
 	}
 

@@ -27,12 +27,12 @@ type DistibutedStorage struct {
 	repo Repository
 	s3   ObjectStorage
 
-	cfg     config.DistrConfig
+	cfg     config.StorageConfig
 	infoLog *zap.Logger
 	errLog  *zap.Logger
 }
 
-func NewDistibutedStorage(infoLog, errLog *zap.Logger, cfg config.DistrConfig, repo Repository, s3 ObjectStorage) *DistibutedStorage {
+func NewDistibutedStorage(infoLog, errLog *zap.Logger, cfg config.StorageConfig, repo Repository, s3 ObjectStorage) *DistibutedStorage {
 	return &DistibutedStorage{
 		repo:    repo,
 		s3:      s3,
@@ -44,6 +44,9 @@ func NewDistibutedStorage(infoLog, errLog *zap.Logger, cfg config.DistrConfig, r
 
 // todo: make s3 uploads "transactional"
 func (ds *DistibutedStorage) Store(ctx context.Context, video, manifest File, chunks []File) error {
+	// remove locally stored files
+	defer ds.truncateLocalDir()
+
 	vidLocation, err := ds.s3.Store(ctx, video)
 	if err != nil {
 		return err
@@ -59,12 +62,14 @@ func (ds *DistibutedStorage) Store(ctx context.Context, video, manifest File, ch
 		return err
 	}
 
+	// update location field of each file
 	video.Location = vidLocation
 	manifest.Location = manLocation
 	for i := range chunks {
 		chunks[i].Location = chunkLocations[i]
 	}
 
+	// store data in the db
 	return ds.repo.CreateAll(ctx, video, manifest, chunks)
 }
 
@@ -84,6 +89,22 @@ func (ds *DistibutedStorage) Remove(ctx context.Context, filename string) error 
 	}
 
 	return ds.s3.Delete(ctx, fileLocation)
+}
+
+func (ds *DistibutedStorage) truncateLocalDir() error {
+	if err := os.Remove(ds.cfg.Local.ChunkPath); err != nil {
+		return err
+	}
+
+	if err := os.Remove(ds.cfg.Local.ManifestPath); err != nil {
+		return err
+	}
+
+	if err := os.RemoveAll(ds.cfg.Local.ChunkPath); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // local file system based storage

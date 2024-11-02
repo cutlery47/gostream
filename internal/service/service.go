@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/cutlery47/gostream/config"
 	"github.com/cutlery47/gostream/internal/storage"
@@ -58,17 +59,21 @@ func (ss *StreamService) Upload(ctx context.Context, videoReader io.ReadCloser, 
 	var sManifest *storage.File
 	var sChunks []storage.File
 
+	nameFromPath := func(path string) string {
+		pathSlice := strings.Split(path, "/")
+		return pathSlice[len(pathSlice)-1]
+	}
+
 	if sVideo, err = storage.FromFD(video, videoName); err != nil {
 		return err
 	}
 
-	if sManifest, err = storage.FromFD(manifest, manifest.Name()); err != nil {
+	if sManifest, err = storage.FromFD(manifest, nameFromPath(manifest.Name())); err != nil {
 		return err
 	}
 
-	// var sChunks []storage.File
 	for _, chunk := range chunks {
-		sChunk, err := storage.FromFD(chunk, chunk.Name())
+		sChunk, err := storage.FromFD(chunk, nameFromPath(chunk.Name()))
 		if err != nil {
 			return err
 		}

@@ -45,7 +45,7 @@ func Run() {
 			log.Fatal("Error when initializing s3: ", err)
 		}
 
-		st = storage.NewDistibutedStorage(infLog, errLog, cfg.Storage.Distr, repo, s3)
+		st = storage.NewDistibutedStorage(infLog, errLog, cfg.Storage, repo, s3)
 	}
 
 	svc := service.NewStreamService(

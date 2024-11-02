@@ -6,7 +6,7 @@ CREATE TABLE file_schema.files (
     bucket      file_schema.string,
     object      file_schema.string,
     
-    CONSTRAINT  unique_filename UNIQUE (filename)
+    CONSTRAINT  unique_filename UNIQUE (name)
 );
 
 CREATE TABLE file_schema.files_meta (

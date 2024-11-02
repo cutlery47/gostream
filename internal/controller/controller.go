@@ -14,7 +14,7 @@ type Controller struct {
 }
 
 func New(
-	service service.FileService,
+	service service.Service,
 	reqLog, errLog, infoLog *zap.Logger) *Controller {
 	e := echo.New()
 	r := newRouter(errLog, service)

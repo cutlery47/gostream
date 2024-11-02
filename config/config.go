@@ -8,28 +8,28 @@ import (
 )
 
 type Config struct {
-	Log     loggerConfig
-	Storage storageConfig
-	Segment segmentConfig
+	Log     LoggerConfig
+	Storage StorageConfig
+	Segment SegmentConfig
 }
 
-type loggerConfig struct {
+type LoggerConfig struct {
 	AppLogsPath string
 }
 
-type storageConfig struct {
+type StorageConfig struct {
 	StorageType string
-	Local       localStorageConfig
-	Distr       distrStorageConfig
+	Local       LocalConfig
+	Distr       DistrConfig
 }
 
-type localStorageConfig struct {
+type LocalConfig struct {
 	ManifestPath string
 	ChunkPath    string
 	VideoPath    string
 }
 
-type distrStorageConfig struct {
+type DistrConfig struct {
 	S3Config S3Config
 	DBConfig DBConfig
 }
@@ -54,18 +54,18 @@ type S3Config struct {
 	Password    string
 }
 
-type segmentConfig struct {
+type SegmentConfig struct {
 	Time int
 }
 
 func New() (*Config, error) {
 	godotenv.Load("yours.env")
 
-	logConfig := loggerConfig{
+	logConfig := LoggerConfig{
 		AppLogsPath: os.Getenv("APP_LOGS_PATH"),
 	}
 
-	lsConfig := localStorageConfig{
+	lsConfig := LocalConfig{
 		ManifestPath: os.Getenv("MANIFEST_PATH"),
 		ChunkPath:    os.Getenv("CHUNK_PATH"),
 		VideoPath:    os.Getenv("VIDEO_PATH"),
@@ -89,12 +89,12 @@ func New() (*Config, error) {
 		SSLMode:  os.Getenv("POSTGRES_SSL"),
 	}
 
-	dsConfig := distrStorageConfig{
+	dsConfig := DistrConfig{
 		S3Config: s3Config,
 		DBConfig: dbConfig,
 	}
 
-	sConfig := storageConfig{
+	sConfig := StorageConfig{
 		StorageType: os.Getenv("STORAGE_TYPE"),
 		Local:       lsConfig,
 		Distr:       dsConfig,
@@ -105,7 +105,7 @@ func New() (*Config, error) {
 		return nil, err
 	}
 
-	segConfig := segmentConfig{
+	segConfig := SegmentConfig{
 		Time: segtime,
 	}
 

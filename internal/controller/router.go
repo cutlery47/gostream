@@ -11,11 +11,11 @@ import (
 )
 
 type router struct {
-	service    service.FileService
+	service    service.Service
 	errHandler errHandler
 }
 
-func newRouter(errLog *zap.Logger, service service.FileService) *router {
+func newRouter(errLog *zap.Logger, service service.Service) *router {
 	return &router{
 		service:    service,
 		errHandler: *newErrHandler(errLog),

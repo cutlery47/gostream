@@ -6,76 +6,67 @@ import (
 	"io"
 	"os"
 
+	"github.com/cutlery47/gostream/config"
 	"github.com/cutlery47/gostream/internal/storage"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
 
 // service, responsible for all data manipulations
-type FileService interface {
+type Service interface {
 	Upload(ctx context.Context, videoReader io.ReadCloser, videoName string) error
 	Remove(ctx context.Context, filename string) error
 	Serve(ctx context.Context, filename string) (io.ReadCloser, error)
 }
 
-// service for creating and removing manifest file and .ts chunkss
-type CreatorService interface {
-	Create(paths storage.Paths, video *os.File, videoName string) (*os.File, []*os.File, error)
-	CreateVideo(paths storage.Paths, videoReader io.ReadCloser, videoName string) (*os.File, error)
-	Remove(paths storage.Paths) error
-}
-
-// FileService impl
 type StreamService struct {
-	log            *zap.Logger
-	storage        storage.Storage
-	creatorService CreatorService
+	storage storage.Storage
+
+	cfg config.LocalConfig
+	log *zap.Logger
 }
 
-func NewStreamService(log *zap.Logger, storage storage.Storage, creatorService CreatorService) *StreamService {
+func NewStreamService(log *zap.Logger, cfg config.LocalConfig, storage storage.Storage) *StreamService {
 	return &StreamService{
-		log:            log,
-		storage:        storage,
-		creatorService: creatorService,
+		storage: storage,
+
+		cfg: cfg,
+		log: log,
 	}
 }
 
 func (ss *StreamService) Upload(ctx context.Context, videoReader io.ReadCloser, videoName string) error {
-	// figuring out where to store files locally
-	paths := ss.storage.Paths()
 	// create necessary directories if don't exist
-	createDirs(paths.VidPath, paths.ManPath, paths.ChunkPath, videoName)
+	createDirs(ss.cfg.VideoPath, ss.cfg.ManifestPath, ss.cfg.ChunkPath, videoName)
 
-	precisePaths := storage.Paths{
-		VidPath:   fmt.Sprintf("%v/%v.mp4", paths.VidPath, videoName),
-		ManPath:   fmt.Sprintf("%v/%v.m3u8", paths.ManPath, videoName),
-		ChunkPath: fmt.Sprintf("%v/%v/", paths.ChunkPath, videoName),
-	}
-
-	video, err := ss.creatorService.CreateVideo(precisePaths, videoReader, videoName)
+	videoPath := fmt.Sprintf("%v/%v.mp4", ss.cfg.VideoPath, videoName)
+	video, err := createVideo(videoReader, videoPath)
 	if err != nil {
 		return err
 	}
 
 	// creating all the files locally
-	manifest, chunks, err := ss.creatorService.Create(precisePaths, video, videoName)
+	manifestPath := fmt.Sprintf("%v/%v.m3u8", ss.cfg.ManifestPath, videoName)
+	chunkPath := fmt.Sprintf("%v/%v/", ss.cfg.ChunkPath, videoName)
+	manifest, chunks, err := createManifestAndChunks(ss.log, manifestPath, chunkPath, videoPath, videoName)
 	if err != nil {
 		return err
 	}
 
-	defer ss.creatorService.Remove(precisePaths)
-
-	sVideo, err := storage.FromFD(video, videoName)
-	if err != nil {
-		return err
-	}
-
-	sManifest, err := storage.FromFD(manifest, manifest.Name())
-	if err != nil {
-		return err
-	}
-
+	// values to be filled and passed to the storage
+	var sVideo *storage.File
+	var sManifest *storage.File
 	var sChunks []storage.File
+
+	if sVideo, err = storage.FromFD(video, videoName); err != nil {
+		return err
+	}
+
+	if sManifest, err = storage.FromFD(manifest, manifest.Name()); err != nil {
+		return err
+	}
+
+	// var sChunks []storage.File
 	for _, chunk := range chunks {
 		sChunk, err := storage.FromFD(chunk, chunk.Name())
 		if err != nil {
@@ -96,27 +87,14 @@ func (ss *StreamService) Serve(ctx context.Context, filename string) (io.ReadClo
 	return ss.storage.Get(ctx, filename)
 }
 
-// CreateService impl
-type ManifestService struct {
-	errLog  *zap.Logger
-	infoLog *zap.Logger
-}
-
-func NewManifestService(infoLog, errLog *zap.Logger) *ManifestService {
-	return &ManifestService{
-		errLog:  errLog,
-		infoLog: infoLog,
-	}
-}
-
-func (ms *ManifestService) CreateVideo(paths storage.Paths, videoReader io.ReadCloser, videoName string) (*os.File, error) {
+func createVideo(videoReader io.ReadCloser, videoPath string) (*os.File, error) {
 	// reading raw .mp4 video file
 	videoData, err := io.ReadAll(videoReader)
 	if err != nil {
 		return nil, err
 	}
 
-	video, err := os.OpenFile(paths.VidPath, os.O_CREATE, 0664)
+	video, err := os.OpenFile(videoPath, os.O_CREATE|os.O_RDWR, 0664)
 	if err != nil {
 		return nil, err
 	}
@@ -128,21 +106,21 @@ func (ms *ManifestService) CreateVideo(paths storage.Paths, videoReader io.ReadC
 	return video, nil
 }
 
-func (ms *ManifestService) Create(paths storage.Paths, video *os.File, videoName string) (*os.File, []*os.File, error) {
+func createManifestAndChunks(infoLog *zap.Logger, manifestPath, chunkPath, videoPath, videoName string) (*os.File, []*os.File, error) {
 	// segmentation + .m3u8 creation
 	// results in manifest file and chunks creation
 	cmd := utils.SegmentVideoAndCreateManifest(
-		paths.VidPath,
+		videoPath,
 		// precise manifest path
-		paths.ManPath,
+		manifestPath,
 		// chunk file path + template for segmentation
-		fmt.Sprintf("%v/%v_%%4d.ts", paths.ChunkPath, videoName),
+		fmt.Sprintf("%v/%v_%%4d.ts", chunkPath, videoName),
 	)
 
 	// check if segmentation went smoothely
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		ms.infoLog.Info(string(out))
+		infoLog.Info(string(out))
 		return nil, nil, ErrSegmentationException
 	}
 
@@ -150,17 +128,17 @@ func (ms *ManifestService) Create(paths storage.Paths, video *os.File, videoName
 	var chunks []*os.File
 
 	// retrieving manifest data
-	manifest, err = os.Open(paths.ManPath)
+	manifest, err = os.Open(manifestPath)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// itrating over each chunk in the local directory
-	chunkDir, _ := os.ReadDir(paths.ChunkPath)
+	chunkDir, _ := os.ReadDir(chunkPath)
 	// filling up chunk array
 	for _, el := range chunkDir {
 		// retrieving chunk data
-		chunk, err := os.Open(paths.ChunkPath + el.Name())
+		chunk, err := os.Open(chunkPath + el.Name())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -169,22 +147,6 @@ func (ms *ManifestService) Create(paths storage.Paths, video *os.File, videoName
 	}
 
 	return manifest, chunks, nil
-}
-
-func (ms *ManifestService) Remove(paths storage.Paths) error {
-	if err := os.Remove(paths.VidPath); err != nil {
-		return err
-	}
-
-	if err := os.Remove(paths.ManPath); err != nil {
-		return err
-	}
-
-	if err := os.RemoveAll(paths.ChunkPath); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func createDirs(vidPath, manPath, chunkPath, objName string) {

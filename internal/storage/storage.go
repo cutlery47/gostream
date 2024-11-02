@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cutlery47/gostream/config"
 	"github.com/cutlery47/gostream/internal/utils"
 	"go.uber.org/zap"
 )
@@ -19,8 +20,6 @@ type Storage interface {
 	Get(ctx context.Context, filename string) (io.ReadCloser, error)
 	// removes file
 	Remove(ctx context.Context, filename string) error
-	// returns local paths
-	Paths() Paths
 }
 
 // db + obj storage based storage
@@ -28,18 +27,18 @@ type DistibutedStorage struct {
 	repo Repository
 	s3   ObjectStorage
 
+	cfg     config.DistrConfig
 	infoLog *zap.Logger
 	errLog  *zap.Logger
-	paths   Paths
 }
 
-func NewDistibutedStorage(infoLog, errLog *zap.Logger, paths Paths, repo Repository, s3 ObjectStorage) *DistibutedStorage {
+func NewDistibutedStorage(infoLog, errLog *zap.Logger, cfg config.DistrConfig, repo Repository, s3 ObjectStorage) *DistibutedStorage {
 	return &DistibutedStorage{
 		repo:    repo,
 		s3:      s3,
+		cfg:     cfg,
 		infoLog: infoLog,
 		errLog:  errLog,
-		paths:   paths,
 	}
 }
 
@@ -87,20 +86,17 @@ func (ds *DistibutedStorage) Remove(ctx context.Context, filename string) error 
 	return ds.s3.Delete(ctx, fileLocation)
 }
 
-func (ds DistibutedStorage) Paths() Paths {
-	return ds.paths
-}
-
 // local file system based storage
 type LocalStorage struct {
 	errLog *zap.Logger
-	paths  Paths
+
+	cfg config.LocalConfig
 }
 
-func NewLocalStorage(errLog *zap.Logger, paths Paths) *LocalStorage {
+func NewLocalStorage(errLog *zap.Logger, cfg config.LocalConfig) *LocalStorage {
 	return &LocalStorage{
 		errLog: errLog,
-		paths:  paths,
+		cfg:    cfg,
 	}
 }
 
@@ -127,29 +123,18 @@ func (ls *LocalStorage) Remove(ctx context.Context, filename string) error {
 	return os.Remove(filePath)
 }
 
-func (ls *LocalStorage) Paths() Paths {
-	return ls.paths
-}
-
 // used to detect where given file is stored
 func (ls *LocalStorage) determinePath(filename string) (filePath string, err error) {
 	if strings.HasSuffix(filename, ".mp4") {
-		filePath = fmt.Sprintf("%v/%v", ls.paths.VidPath, filename)
+		filePath = fmt.Sprintf("%v/%v", ls.cfg.VideoPath, filename)
 	} else if strings.HasSuffix(filename, ".m3u8") {
-		filePath = fmt.Sprintf("%v/%v", ls.paths.ManPath, filename)
+		filePath = fmt.Sprintf("%v/%v", ls.cfg.ManifestPath, filename)
 	} else if strings.HasSuffix(filename, ".ts") {
 		subdir := utils.RemoveSuffix(filename, "_")
-		filePath = fmt.Sprintf("%v/%v/%v", ls.paths.ChunkPath, subdir, filename)
+		filePath = fmt.Sprintf("%v/%v/%v", ls.cfg.ChunkPath, subdir, filename)
 	} else {
 		return filePath, ErrUnsupportedFileFormat
 	}
 
 	return filePath, nil
-}
-
-// structure for storing paths to local files
-type Paths struct {
-	VidPath   string
-	ManPath   string
-	ChunkPath string
 }

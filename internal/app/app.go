@@ -4,11 +4,12 @@ import (
 	"log"
 
 	"github.com/cutlery47/gostream/config"
-	"github.com/cutlery47/gostream/internal/controller"
+	v1 "github.com/cutlery47/gostream/internal/controller/http/v1"
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/cutlery47/gostream/internal/storage"
+	"github.com/cutlery47/gostream/pkg/httpserver"
 	"github.com/cutlery47/gostream/pkg/logger"
-	"github.com/cutlery47/gostream/pkg/server"
+	"github.com/labstack/echo/v4"
 )
 
 func Run() {
@@ -54,14 +55,8 @@ func Run() {
 		st,
 	)
 
-	ctr := controller.New(
-		svc,
-		reqLog,
-		errLog,
-		infLog,
-	)
+	e := echo.New()
+	v1.NewController(e, svc, reqLog, errLog, infLog)
 
-	srv := server.New(ctr.Handler())
-
-	srv.Run()
+	httpserver.New(e).Run()
 }

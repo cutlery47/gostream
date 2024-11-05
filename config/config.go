@@ -1,32 +1,29 @@
 package config
 
 import (
-	"os"
-	"strconv"
-
+	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
 	Log     LoggerConfig
 	Storage StorageConfig
-	Segment SegmentConfig
+	Flag    FlagConfig
 }
 
 type LoggerConfig struct {
-	AppLogsPath string
+	AppLogsPath string `env:"APP_LOGS_PATH"`
 }
 
 type StorageConfig struct {
-	StorageType string
-	Local       LocalConfig
-	Distr       DistrConfig
+	Local LocalConfig
+	Distr DistrConfig
 }
 
 type LocalConfig struct {
-	ManifestPath string
-	ChunkPath    string
-	VideoPath    string
+	ManifestPath string `env:"MANIFEST_PATH"`
+	ChunkPath    string `env:"CHUNK_PATH"`
+	VideoPath    string `env:"VIDEO_PATH"`
 }
 
 type DistrConfig struct {
@@ -35,83 +32,55 @@ type DistrConfig struct {
 }
 
 type DBConfig struct {
-	User     string
-	Password string
-	Host     string
-	Port     string
-	DBName   string
-	SSLMode  string
+	User     string `env:"POSTGRES_USER"`
+	Password string `env:"POSTGRES_PASSWORD"`
+	Host     string `env:"POSTGRES_HOST"`
+	Port     string `env:"POSTGRES_PORT"`
+	DBName   string `env:"POSTGRES_NAME"`
+	SSLMode  string `env:"POSTGRES_SSL"`
 }
 
 type S3Config struct {
-	Host        string
-	Port        string
-	AdmPort     string
-	VidBucket   string
-	ManBucket   string
-	ChunkBucket string
-	User        string
-	Password    string
+	Host        string `env:"MINIO_HOST"`
+	Port        string `env:"MINIO_PORT"`
+	AdmPort     string `env:"MINIO_ADMIN_PORT"`
+	VidBucket   string `env:"MINIO_VID_BUCKET"`
+	ManBucket   string `env:"MINIO_CHUNK_BUCKET"`
+	ChunkBucket string `env:"MINIO_MAN_BUCKET"`
 }
 
-type SegmentConfig struct {
-	Time int
+type FlagConfig struct {
+	Time string `env:"SEGMENT_TIME"`
+	Type string `env:"STORAGE_TYPE"`
 }
 
-func New() (*Config, error) {
+func New() (cfg *Config, err error) {
 	godotenv.Load("yours.env")
 
-	logConfig := LoggerConfig{
-		AppLogsPath: os.Getenv("APP_LOGS_PATH"),
+	var s3Conf S3Config
+	var dbConf DBConfig
+	var locConf LocalConfig
+	var logConf LoggerConfig
+	var flgConf FlagConfig
+
+	confs := []interface{}{&s3Conf, &dbConf, &locConf, &logConf, &flgConf}
+	for _, conf := range confs {
+		if err = cleanenv.ReadEnv(conf); err != nil {
+			return nil, err
+		}
 	}
 
-	lsConfig := LocalConfig{
-		ManifestPath: os.Getenv("MANIFEST_PATH"),
-		ChunkPath:    os.Getenv("CHUNK_PATH"),
-		VideoPath:    os.Getenv("VIDEO_PATH"),
+	cfg = &Config{
+		Log: logConf,
+		Storage: StorageConfig{
+			Local: locConf,
+			Distr: DistrConfig{
+				DBConfig: dbConf,
+				S3Config: s3Conf,
+			},
+		},
+		Flag: flgConf,
 	}
 
-	s3Config := S3Config{
-		Host:        os.Getenv("MINIO_HOST"),
-		Port:        os.Getenv("MINIO_PORT"),
-		AdmPort:     os.Getenv("MINIO_ADMIN_PORT"),
-		VidBucket:   os.Getenv("MINIO_VID_BUCKET"),
-		ChunkBucket: os.Getenv("MINIO_CHUNK_BUCKET"),
-		ManBucket:   os.Getenv("MINIO_MAN_BUCKET"),
-	}
-
-	dbConfig := DBConfig{
-		User:     os.Getenv("POSTGRES_USER"),
-		Password: os.Getenv("POSTGRES_PASSWORD"),
-		Host:     os.Getenv("POSTGRES_HOST"),
-		Port:     os.Getenv("POSTGRES_PORT"),
-		DBName:   os.Getenv("POSTGRES_NAME"),
-		SSLMode:  os.Getenv("POSTGRES_SSL"),
-	}
-
-	dsConfig := DistrConfig{
-		S3Config: s3Config,
-		DBConfig: dbConfig,
-	}
-
-	sConfig := StorageConfig{
-		StorageType: os.Getenv("STORAGE_TYPE"),
-		Local:       lsConfig,
-		Distr:       dsConfig,
-	}
-
-	segtime, err := strconv.Atoi(os.Getenv("SEGMENT_TIME"))
-	if err != nil {
-		return nil, err
-	}
-
-	segConfig := SegmentConfig{
-		Time: segtime,
-	}
-
-	return &Config{
-		Log:     logConfig,
-		Storage: sConfig,
-		Segment: segConfig,
-	}, nil
+	return cfg, nil
 }

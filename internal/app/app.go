@@ -25,8 +25,10 @@ import (
 func Run() {
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatal("error when loading config:", err)
+		log.Fatal("error when loading config: ", err)
 	}
+
+	log.Println(cfg)
 
 	reqLog := logger.New(cfg.Log.AppLogsPath+"/request.log", false)
 	errLog := logger.New(cfg.Log.AppLogsPath+"/error.log", true)
@@ -43,7 +45,7 @@ func Run() {
 
 	var st storage.Storage
 
-	if cfg.Storage.StorageType == "local" {
+	if cfg.Flag.Type == "local" {
 		st = storage.NewLocalStorage(errLog, cfg.Storage.Local)
 	} else {
 		repo, err := storage.NewFileRepository(cfg.Storage.Distr.DBConfig)

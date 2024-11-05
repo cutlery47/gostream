@@ -12,6 +12,16 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+//	@title			Gostream
+//	@version		1.0
+//	@description	A simple golang streaming service.
+
+//	@contact.name	Arkhip Ivanchenko
+//	@contact.url	https://github.com/cutlery47
+//	@contact.email	kitchen_cutlery@mail.ru
+
+//	@host	localhost:8080
+
 func Run() {
 	cfg, err := config.New()
 	if err != nil {

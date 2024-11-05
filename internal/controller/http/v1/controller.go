@@ -1,6 +1,7 @@
 package v1
 
 import (
+	_ "github.com/cutlery47/gostream/docs"
 	"github.com/cutlery47/gostream/internal/service"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -12,7 +13,7 @@ func NewController(e *echo.Echo, s service.Service, reqLog, errLog, infoLog *zap
 	e.Use(middleware.Recover())
 
 	e.GET("/health", func(c echo.Context) error { return c.NoContent(200) })
-	e.GET("/swagger", echoSwagger.WrapHandler)
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
 	v1 := e.Group("/api/v1", requestLoggerMiddleware(reqLog))
 	{

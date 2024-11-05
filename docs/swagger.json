@@ -1,0 +1,158 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "A simple golang streaming service.",
+        "title": "Gostream",
+        "contact": {
+            "name": "Arkhip Ivanchenko",
+            "url": "https://github.com/cutlery47",
+            "email": "kitchen_cutlery@mail.ru"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "paths": {
+        "/api/v1/files": {
+            "post": {
+                "description": "Upload file with name",
+                "tags": [
+                    "files"
+                ],
+                "summary": "Upload file to storage",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "file to be uploaded",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name of the file",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v1.fileRoutes"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/files/": {
+            "get": {
+                "description": "Get file by name",
+                "tags": [
+                    "files"
+                ],
+                "summary": "Retrieve file from storage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "name of the file",
+                        "name": "filename",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Binary file",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    },
+                    "404": {
+                        "description": "Data couldn't be found",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete file by name",
+                "tags": [
+                    "files"
+                ],
+                "summary": "Delete file from storage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "name of the file",
+                        "name": "filename",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    },
+                    "404": {
+                        "description": "Data couldn't be found",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "$ref": "#/definitions/echo.HTTPError"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "echo.HTTPError": {
+            "type": "object",
+            "properties": {
+                "message": {}
+            }
+        },
+        "v1.fileRoutes": {
+            "type": "object"
+        }
+    }
+}

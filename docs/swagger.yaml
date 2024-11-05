@@ -1,0 +1,105 @@
+definitions:
+  echo.HTTPError:
+    properties:
+      message: {}
+    type: object
+  v1.fileRoutes:
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: kitchen_cutlery@mail.ru
+    name: Arkhip Ivanchenko
+    url: https://github.com/cutlery47
+  description: A simple golang streaming service.
+  title: Gostream
+  version: "1.0"
+paths:
+  /api/v1/files:
+    post:
+      description: Upload file with name
+      parameters:
+      - description: file to be uploaded
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: name of the file
+        in: formData
+        name: name
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v1.fileRoutes'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Upload file to storage
+      tags:
+      - files
+  /api/v1/files/:
+    delete:
+      description: Delete file by name
+      parameters:
+      - description: name of the file
+        in: query
+        name: filename
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "404":
+          description: Data couldn't be found
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Delete file from storage
+      tags:
+      - files
+    get:
+      description: Get file by name
+      parameters:
+      - description: name of the file
+        in: query
+        name: filename
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Binary file
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "404":
+          description: Data couldn't be found
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+        "500":
+          description: Internal error
+          schema:
+            $ref: '#/definitions/echo.HTTPError'
+      summary: Retrieve file from storage
+      tags:
+      - files
+swagger: "2.0"

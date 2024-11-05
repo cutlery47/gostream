@@ -5,6 +5,8 @@ shell = /bin/bash
 user = $(shell whoami)
 gid = $(shell id -g $(user))
 
+.PHONY: docs
+
 run:
 	mkdir -p $(APP_LOGS_PATH)
 	go run cmd/main.go
@@ -32,3 +34,7 @@ prune:
 
 unbuild:
 	docker rmi gostream-postgres-image
+
+docs:
+	swag init --parseDependency --parseInternal -g app.go -d ./internal/app,./internal/controller/http/v1
+	swag fmt -g app.go -d ./internal/app,./internal/controller/http/v1
